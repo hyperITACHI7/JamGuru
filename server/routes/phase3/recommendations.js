@@ -11,7 +11,7 @@ const SAFE_USER = { id: true, username: true, displayName: true, avatarUrl: true
 // POST /api/recommendations — send a song recommendation to a friend
 router.post('/', auth, async (req, res) => {
   try {
-    const { songId, recipientId, context } = req.body;
+    const { songId, recipientId, context, requestId } = req.body;
 
     if (!songId || !recipientId) {
       return res.status(400).json({ error: 'songId and recipientId are required' });
@@ -46,13 +46,21 @@ router.post('/', auth, async (req, res) => {
         senderId: req.userId,
         recipientId,
         songId,
-        context: context?.trim() || null,
+        context:   context?.trim() || null,
+        requestId: requestId ?? null,
       },
       include: {
         song: true,
         sender: { select: SAFE_USER },
       },
     });
+
+    if (requestId) {
+      await prisma.songRequest.updateMany({
+        where: { id: requestId, status: 'OPEN' },
+        data:  { status: 'FULFILLED' },
+      });
+    }
 
     // Upsert daily_scores — increment recs_sent for today
     const today = new Date(new Date().toISOString().slice(0, 10));
@@ -138,7 +146,7 @@ router.get('/conversation/:friendId', auth, async (req, res) => {
     const me       = req.userId;
     const friendId = req.params.friendId;
 
-    const [received, sent] = await Promise.all([
+    const [received, sent, requests] = await Promise.all([
       // Recs the friend sent to me — include whether I liked them + my tags
       prisma.recommendation.findMany({
         where: { senderId: friendId, recipientId: me },
@@ -157,10 +165,21 @@ router.get('/conversation/:friendId', auth, async (req, res) => {
         },
         orderBy: { sentAt: 'asc' },
       }),
+      // Song requests in either direction
+      prisma.songRequest.findMany({
+        where: {
+          OR: [
+            { senderId: me, recipientId: friendId },
+            { senderId: friendId, recipientId: me },
+          ],
+        },
+        orderBy: { sentAt: 'asc' },
+      }),
     ]);
 
     const fmt = (recs, dir) =>
       recs.map(r => ({
+        type:      'recommendation',
         id:        r.id,
         sentAt:    r.sentAt,
         direction: dir,
@@ -175,6 +194,16 @@ router.get('/conversation/:friendId', auth, async (req, res) => {
     const messages = [
       ...fmt(received, 'received'),
       ...fmt(sent, 'sent'),
+      ...requests.map(r => ({
+        type:        'request',
+        id:          r.id,
+        sentAt:      r.sentAt,
+        direction:   r.senderId === me ? 'sent' : 'received',
+        templateId:  r.templateId,
+        variables:   r.variables,
+        renderedText: r.renderedText,
+        status:      r.status,
+      })),
     ].sort((a, b) => new Date(a.sentAt) - new Date(b.sentAt));
 
     res.json(messages);

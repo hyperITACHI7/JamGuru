@@ -1,5 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
-import { ArrowLeft, Play, Pause, Heart, Music, MessageCircle, Sparkles, Send, X, ChevronRight, ThumbsDown, Plus, Search, ChevronLeft, ListMusic } from 'lucide-react'
+import {
+  ArrowLeft, Play, Pause, Heart, Music, MessageCircle, Sparkles, Send, X,
+  ChevronRight, ThumbsDown, Plus, Search, ChevronLeft, ListMusic, HelpCircle,
+} from 'lucide-react'
 import FriendProfileSheet from '../components/FriendProfileSheet'
 import { getConversation, sendRecommendation } from '../phase3/api/recommendations'
 import {
@@ -9,6 +12,8 @@ import {
 } from '../phase4/api/likes'
 import { getLikedSongs } from '../api/songs'
 import { getPlaylists, getPlaylist } from '../api/auth'
+import { sendSongRequest } from '../api/songRequests'
+import { REQUEST_TEMPLATES, renderTemplate } from '../data/requestTemplates'
 import FeedbackTags from '../phase4/components/FeedbackTags'
 import { usePlayer } from '../context/PlayerContext'
 import { getAiSuggestion } from '../phase7/api/ai'
@@ -20,6 +25,28 @@ function formatTime(iso) {
   if (diff < 3600)  return `${Math.floor(diff / 60)}m ago`
   if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`
   return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
+}
+
+// Splits a template string into text spans + interactive pill buttons
+function renderTemplateWithPills(templateId, vars, cycleVar) {
+  const tmpl = REQUEST_TEMPLATES.find(t => t.id === templateId)
+  if (!tmpl) return null
+  const parts = tmpl.template.split(/(\{[^}]+\})/)
+  return parts.map((part, i) => {
+    const match = part.match(/^\{(\w+)\}$/)
+    if (!match) return <span key={i}>{part}</span>
+    const key = match[1]
+    const ph  = tmpl.placeholders[key]
+    return (
+      <button
+        key={i}
+        onClick={() => cycleVar(key, ph.options)}
+        className="inline-flex items-center gap-1 bg-[#1DB954]/20 border border-[#1DB954]/40 text-[#1DB954] text-xs font-semibold px-2 py-0.5 rounded-full hover:bg-[#1DB954]/30 transition-colors"
+      >
+        {vars[key]} <ChevronRight size={9} />
+      </button>
+    )
+  })
 }
 
 function Bubble({ msg, onLike, justLiked }) {
@@ -181,13 +208,50 @@ function Bubble({ msg, onLike, justLiked }) {
   )
 }
 
+function RequestBubble({ msg, onPickSong }) {
+  const isSent = msg.direction === 'sent'
+  return (
+    <div className={`flex ${isSent ? 'justify-end' : 'justify-start'} mb-4 px-4`}>
+      <div className={`max-w-[72%] rounded-2xl p-3 ${
+        isSent ? 'bg-[#1DB954]/10 border border-[#1DB954]/20 rounded-tr-sm' : 'bg-[#282828] rounded-tl-sm'
+      }`}>
+        <div className="flex items-center gap-1.5 mb-2">
+          <Music size={10} className="text-[#1DB954]" />
+          <span className="text-[#1DB954] text-[9px] font-bold uppercase tracking-wider">Song Request</span>
+        </div>
+        <p className="text-white text-xs leading-relaxed">"{msg.renderedText}"</p>
+        {isSent ? (
+          <p className={`text-[10px] mt-2 font-medium ${msg.status === 'FULFILLED' ? 'text-[#1DB954]' : 'text-[#535353]'}`}>
+            {msg.status === 'FULFILLED' ? '✓ Song sent' : '● Waiting for a pick…'}
+          </p>
+        ) : (
+          <>
+            {msg.status === 'OPEN' && (
+              <button
+                onClick={onPickSong}
+                className="mt-2 flex items-center gap-1 text-[#1DB954] text-[10px] font-semibold hover:text-[#1ed760] transition-colors"
+              >
+                Pick a song <ChevronRight size={10} />
+              </button>
+            )}
+            {msg.status === 'FULFILLED' && (
+              <p className="text-[#535353] text-[10px] mt-2">Song sent ✓</p>
+            )}
+          </>
+        )}
+        <p className="text-[#535353] text-[9px] mt-1.5 text-right">{formatTime(msg.sentAt)}</p>
+      </div>
+    </div>
+  )
+}
+
 export default function ConversationView({ friend, onBack }) {
   const [messages, setMessages]         = useState([])
   const [loading, setLoading]           = useState(true)
   const [liking, setLiking]             = useState(null)
   const [justLikedIds, setJustLikedIds] = useState(new Set())
 
-  // Compose state
+  // Compose: AI suggest / library pick
   const [suggesting, setSuggesting]     = useState(false)
   const [suggested, setSuggested]       = useState(null)
   const [suggestNote, setSuggestNote]   = useState('')
@@ -195,14 +259,23 @@ export default function ConversationView({ friend, onBack }) {
   const [suggestError, setSuggestError] = useState('')
 
   // Library picker — two-level: playlists → songs
-  const [showLibrary, setShowLibrary]         = useState(false)
-  const [libraryView, setLibraryView]         = useState('playlists') // 'playlists' | 'songs'
-  const [playlists, setPlaylists]             = useState([])
+  const [showLibrary, setShowLibrary]           = useState(false)
+  const [libraryView, setLibraryView]           = useState('playlists')
+  const [playlists, setPlaylists]               = useState([])
   const [playlistsLoading, setPlaylistsLoading] = useState(false)
-  const [activePlaylist, setActivePlaylist]   = useState(null)
-  const [librarySongs, setLibrarySongs]       = useState([])
-  const [libraryLoading, setLibraryLoading]   = useState(false)
-  const [librarySearch, setLibrarySearch]     = useState('')
+  const [activePlaylist, setActivePlaylist]     = useState(null)
+  const [librarySongs, setLibrarySongs]         = useState([])
+  const [libraryLoading, setLibraryLoading]     = useState(false)
+  const [librarySearch, setLibrarySearch]       = useState('')
+
+  // Song request composer
+  const [showRequest, setShowRequest]           = useState(false)
+  const [requestStep, setRequestStep]           = useState('templates')
+  const [selectedTemplate, setSelectedTemplate] = useState(null)
+  const [requestVars, setRequestVars]           = useState({})
+  const [sendingRequest, setSendingRequest]     = useState(false)
+  const [requestError, setRequestError]         = useState('')
+  const [pendingRequestId, setPendingRequestId] = useState(null)
 
   const bottomRef = useRef(null)
   const searchRef = useRef(null)
@@ -224,7 +297,9 @@ export default function ConversationView({ friend, onBack }) {
     if (showLibrary) setTimeout(() => searchRef.current?.focus(), 50)
   }, [showLibrary, libraryView])
 
+  // ── Library picker ──────────────────────────────────────────
   async function openLibrary() {
+    setShowRequest(false)
     setShowLibrary(true)
     setLibraryView('playlists')
     setLibrarySearch('')
@@ -273,7 +348,7 @@ export default function ConversationView({ friend, onBack }) {
     setLibraryView('playlists')
   }
 
-  const filtered = librarySearch.trim()
+  const filteredLibrary = librarySearch.trim()
     ? (libraryView === 'playlists'
         ? playlists.filter(p => p.name.toLowerCase().includes(librarySearch.toLowerCase()))
         : librarySongs.filter(s =>
@@ -283,6 +358,63 @@ export default function ConversationView({ friend, onBack }) {
       )
     : libraryView === 'playlists' ? playlists : librarySongs
 
+  // ── Song request composer ───────────────────────────────────
+  function openRequestComposer() {
+    setShowRequest(true)
+    setShowLibrary(false)
+    setRequestStep('templates')
+    setSelectedTemplate(null)
+    setRequestVars({})
+    setRequestError('')
+  }
+
+  function selectTemplate(tmpl) {
+    const vars = {}
+    Object.entries(tmpl.placeholders).forEach(([key, ph]) => { vars[key] = ph.options[0] })
+    setSelectedTemplate(tmpl.id)
+    setRequestVars(vars)
+    setRequestStep('customize')
+  }
+
+  function cycleVar(key, options) {
+    setRequestVars(prev => {
+      const idx = options.indexOf(prev[key])
+      return { ...prev, [key]: options[(idx + 1) % options.length] }
+    })
+  }
+
+  async function handleSendRequest() {
+    const tmpl = REQUEST_TEMPLATES.find(t => t.id === selectedTemplate)
+    if (!tmpl) return
+    const renderedText = renderTemplate(selectedTemplate, requestVars)
+    setSendingRequest(true)
+    setRequestError('')
+    try {
+      await sendSongRequest({
+        recipientId:  friend.id,
+        templateId:   selectedTemplate,
+        variables:    requestVars,
+        renderedText,
+      })
+      const { data } = await getConversation(friend.id)
+      setMessages(data)
+      setShowRequest(false)
+      setRequestStep('templates')
+      setSelectedTemplate(null)
+      setRequestVars({})
+    } catch (e) {
+      setRequestError(e.response?.data?.error || 'Failed to send request.')
+    } finally {
+      setSendingRequest(false)
+    }
+  }
+
+  function handlePickSongForRequest(requestId) {
+    setPendingRequestId(requestId)
+    openLibrary()
+  }
+
+  // ── Like handler ────────────────────────────────────────────
   async function handleLike(msg) {
     if (liking === msg.id) return
     setLiking(msg.id)
@@ -327,11 +459,13 @@ export default function ConversationView({ friend, onBack }) {
         songId:      suggested.song.spotifyId,
         recipientId: friend.id,
         context:     suggestNote.trim() || undefined,
+        requestId:   pendingRequestId ?? undefined,
       })
       const { data } = await getConversation(friend.id)
       setMessages(data)
       setSuggested(null)
       setSuggestNote('')
+      setPendingRequestId(null)
     } catch (e) {
       setSuggestError(e.response?.data?.error || 'Failed to send.')
     } finally {
@@ -364,9 +498,7 @@ export default function ConversationView({ friend, onBack }) {
         </button>
       </div>
 
-      {showProfile && (
-        <FriendProfileSheet friend={friend} onClose={() => setShowProfile(false)} />
-      )}
+      {showProfile && <FriendProfileSheet friend={friend} onClose={() => setShowProfile(false)} />}
 
       {/* Chat area */}
       <div className="flex-1 overflow-y-auto py-4">
@@ -385,19 +517,78 @@ export default function ConversationView({ friend, onBack }) {
             <p className="text-center text-[#535353] text-[10px] uppercase tracking-widest mb-6">
               Your conversation with {friend.displayName}
             </p>
-            {messages.map(msg => (
-              <Bubble key={msg.id} msg={msg} onLike={handleLike} justLiked={justLikedIds.has(msg.id)} />
-            ))}
+            {messages.map(msg =>
+              msg.type === 'request'
+                ? <RequestBubble key={msg.id} msg={msg} onPickSong={() => handlePickSongForRequest(msg.id)} />
+                : <Bubble key={msg.id} msg={msg} onLike={handleLike} justLiked={justLikedIds.has(msg.id)} />
+            )}
             <div ref={bottomRef} />
           </>
         )}
       </div>
 
+      {/* Song request composer panel */}
+      {showRequest && (
+        <div className="flex-shrink-0 border-t border-white/5 bg-[#181818] flex flex-col" style={{ maxHeight: '300px' }}>
+          {requestStep === 'templates' ? (
+            <>
+              <div className="flex items-center justify-between px-4 pt-3 pb-2 flex-shrink-0">
+                <span className="text-white text-xs font-semibold">Choose a template</span>
+                <button onClick={() => setShowRequest(false)} className="text-[#535353] hover:text-white transition-colors">
+                  <X size={16} />
+                </button>
+              </div>
+              <div className="overflow-y-auto flex-1 px-3 pb-3 space-y-2">
+                {REQUEST_TEMPLATES.map(tmpl => (
+                  <button
+                    key={tmpl.id}
+                    onClick={() => selectTemplate(tmpl)}
+                    className="w-full text-left bg-[#282828] hover:bg-[#333] rounded-xl p-3 transition-colors"
+                  >
+                    <p className="text-[#1DB954] text-[9px] font-bold uppercase tracking-wider mb-1">{tmpl.label}</p>
+                    <p className="text-white text-xs leading-relaxed">
+                      {tmpl.template.replace(/\{(\w+)\}/g, (_, k) =>
+                        `[${tmpl.placeholders[k]?.label ?? k}]`
+                      )}
+                    </p>
+                  </button>
+                ))}
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="flex items-center gap-2 px-4 pt-3 pb-2 flex-shrink-0">
+                <button onClick={() => setRequestStep('templates')} className="text-[#B3B3B3] hover:text-white transition-colors">
+                  <ChevronLeft size={18} />
+                </button>
+                <span className="text-white text-xs font-semibold flex-1">Customize your request</span>
+                <button onClick={() => setShowRequest(false)} className="text-[#535353] hover:text-white transition-colors">
+                  <X size={16} />
+                </button>
+              </div>
+              <div className="px-4 py-2 flex-1 overflow-y-auto">
+                <div className="text-white text-sm leading-loose flex flex-wrap items-center gap-x-1 gap-y-2">
+                  {renderTemplateWithPills(selectedTemplate, requestVars, cycleVar)}
+                </div>
+                {requestError && <p className="text-red-400 text-[10px] mt-2">{requestError}</p>}
+              </div>
+              <div className="px-4 pb-4 pt-2 flex-shrink-0">
+                <button
+                  onClick={handleSendRequest}
+                  disabled={sendingRequest}
+                  className="w-full py-2.5 rounded-xl bg-[#1DB954] text-black text-sm font-bold disabled:opacity-50 hover:bg-[#1ed760] transition-colors"
+                >
+                  {sendingRequest ? 'Sending…' : 'Send Request'}
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
       {/* Library picker panel — two-level */}
       {showLibrary && (
         <div className="flex-shrink-0 border-t border-white/5 bg-[#181818] flex flex-col" style={{ maxHeight: '300px' }}>
-
-          {/* Panel header */}
           <div className="flex items-center gap-2 px-4 pt-3 pb-2 flex-shrink-0">
             {libraryView === 'songs' && (
               <button onClick={backToPlaylists} className="text-[#B3B3B3] hover:text-white transition-colors flex-shrink-0">
@@ -419,7 +610,10 @@ export default function ConversationView({ friend, onBack }) {
                 </button>
               )}
             </div>
-            <button onClick={() => setShowLibrary(false)} className="text-[#535353] hover:text-white transition-colors flex-shrink-0">
+            <button
+              onClick={() => { setShowLibrary(false); setPendingRequestId(null) }}
+              className="text-[#535353] hover:text-white transition-colors flex-shrink-0"
+            >
               <X size={16} />
             </button>
           </div>
@@ -433,7 +627,6 @@ export default function ConversationView({ friend, onBack }) {
                 </div>
               ) : (
                 <>
-                  {/* Liked Songs — always first */}
                   <button
                     onClick={() => selectPlaylist({ type: 'liked', name: 'Liked Songs' })}
                     className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/5 transition-colors text-left"
@@ -448,11 +641,10 @@ export default function ConversationView({ friend, onBack }) {
                     <ChevronRight size={14} className="text-[#535353] flex-shrink-0" />
                   </button>
 
-                  {/* Imported playlists */}
-                  {filtered.length === 0 && !playlistsLoading && librarySearch ? (
+                  {filteredLibrary.length === 0 && librarySearch ? (
                     <p className="text-center text-[#535353] text-xs py-4">No playlists match</p>
                   ) : (
-                    filtered.map(pl => (
+                    filteredLibrary.map(pl => (
                       <button
                         key={pl.id}
                         onClick={() => selectPlaylist({ ...pl, type: 'playlist' })}
@@ -474,9 +666,7 @@ export default function ConversationView({ friend, onBack }) {
                   )}
 
                   {playlists.length === 0 && !playlistsLoading && !librarySearch && (
-                    <p className="text-center text-[#535353] text-[10px] px-4 pb-4 pt-1">
-                      No imported playlists yet
-                    </p>
+                    <p className="text-center text-[#535353] text-[10px] px-4 pb-4 pt-1">No imported playlists yet</p>
                   )}
                 </>
               )}
@@ -490,12 +680,12 @@ export default function ConversationView({ friend, onBack }) {
                 <div className="flex items-center justify-center py-8">
                   <div className="w-5 h-5 border-2 border-[#1DB954] border-t-transparent rounded-full animate-spin" />
                 </div>
-              ) : filtered.length === 0 ? (
+              ) : filteredLibrary.length === 0 ? (
                 <p className="text-center text-[#535353] text-xs py-8">
                   {librarySearch ? 'No songs match' : 'This playlist is empty'}
                 </p>
               ) : (
-                filtered.map(song => (
+                filteredLibrary.map(song => (
                   <button
                     key={song.spotifyId}
                     onClick={() => selectSong(song)}
@@ -539,8 +729,11 @@ export default function ConversationView({ friend, onBack }) {
                   <Sparkles size={9} /> AI pick
                 </span>
               )}
+              {pendingRequestId && (
+                <span className="text-[#535353] text-[9px] flex-shrink-0">replying to request</span>
+              )}
               <button
-                onClick={() => { setSuggested(null); setSuggestNote(''); setSuggestError('') }}
+                onClick={() => { setSuggested(null); setSuggestNote(''); setSuggestError(''); setPendingRequestId(null) }}
                 className="text-[#535353] hover:text-white transition-colors ml-1"
               >
                 <X size={14} />
@@ -566,6 +759,8 @@ export default function ConversationView({ friend, onBack }) {
         ) : (
           <div className="flex items-center gap-2">
             <p className="text-[#535353] text-xs flex-1 truncate">Share a song with {friend.displayName}</p>
+
+            {/* Library picker */}
             <button
               onClick={openLibrary}
               title="Pick from your library"
@@ -575,6 +770,19 @@ export default function ConversationView({ friend, onBack }) {
             >
               <Plus size={15} />
             </button>
+
+            {/* Song request */}
+            <button
+              onClick={openRequestComposer}
+              title="Request a song"
+              className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 transition-colors ${
+                showRequest ? 'bg-[#1DB954] text-black' : 'bg-[#282828] text-[#B3B3B3] hover:text-white hover:bg-[#3e3e3e]'
+              }`}
+            >
+              <HelpCircle size={15} />
+            </button>
+
+            {/* AI suggest */}
             <button
               onClick={handleAiSuggest}
               disabled={suggesting}

@@ -31,6 +31,8 @@ model User {
   receivedFriendRequests  Friendship[]           @relation("FriendshipAddressee")
   sentRecommendations     Recommendation[]       @relation("RecSender")
   receivedRecommendations Recommendation[]       @relation("RecRecipient")
+  sentRequests            SongRequest[]          @relation("SongReqSender")
+  receivedRequests        SongRequest[]          @relation("SongReqRecipient")
   dailyScores             DailyScore[]
   likesGiven              Like[]                 @relation("LikeGiver")
   monthlyScores           MonthlyScore[]
@@ -115,6 +117,7 @@ model Recommendation {
   groupId     String?  @map("group_id")
   songId        String    @map("song_id")
   context       String?
+  requestId     String?   @map("request_id")
   sentAt        DateTime  @default(now()) @map("sent_at")
   dismissedAt   DateTime? @map("dismissed_at")
   dismissedById String?   @map("dismissed_by_id")
@@ -245,6 +248,22 @@ model PlaylistSong {
 
   @@id([playlistId, spotifyId])
   @@map("playlist_songs")
+}
+
+model SongRequest {
+  id           String   @id @default(uuid())
+  senderId     String   @map("sender_id")
+  recipientId  String   @map("recipient_id")
+  templateId   Int      @map("template_id")
+  variables    Json
+  renderedText String   @map("rendered_text")
+  status       String   @default("OPEN")
+  sentAt       DateTime @default(now()) @map("sent_at")
+
+  sender    User @relation("SongReqSender",    fields: [senderId],    references: [id], onDelete: Cascade)
+  recipient User @relation("SongReqRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+
+  @@map("song_requests")
 }
 
 model GroupScore {
