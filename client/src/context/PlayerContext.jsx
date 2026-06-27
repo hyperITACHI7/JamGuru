@@ -1,4 +1,5 @@
 import { createContext, useContext, useRef, useState } from 'react'
+import { getSong } from '../api/songs'
 
 const noop = () => {}
 const PlayerCtx = createContext({
@@ -33,15 +34,28 @@ export function PlayerProvider({ children }) {
     return audio
   }
 
-  function play(song) {
-    if (!song?.previewUrl) return
-    if (track?.spotifyId === song.spotifyId && audioRef.current) {
+  async function play(song) {
+    if (!song) return
+
+    // If previewUrl is missing, fetch the full track from the API
+    let resolved = song
+    if (!resolved.previewUrl) {
+      try {
+        const { data } = await getSong(song.spotifyId)
+        resolved = data
+      } catch {
+        return
+      }
+    }
+    if (!resolved.previewUrl) return
+
+    if (track?.spotifyId === resolved.spotifyId && audioRef.current) {
       audioRef.current.play().catch(() => {})
       setPlaying(true)
       return
     }
-    const audio = _loadAudio(song)
-    setTrack(song)
+    const audio = _loadAudio(resolved)
+    setTrack(resolved)
     audio.play().catch(() => {})
     setPlaying(true)
   }
@@ -51,12 +65,12 @@ export function PlayerProvider({ children }) {
     setPlaying(false)
   }
 
-  function toggle(song) {
-    if (!song?.previewUrl) return
+  async function toggle(song) {
+    if (!song) return
     if (playing && track?.spotifyId === song.spotifyId) {
       pause()
     } else {
-      play(song)
+      await play(song)
     }
   }
 
