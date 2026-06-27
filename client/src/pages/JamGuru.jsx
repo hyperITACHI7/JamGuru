@@ -61,17 +61,16 @@ export default function JamGuru() {
         />
       </div>
 
-      {/* Mobile messages overlay */}
+      {/* Mobile messages — full screen takeover */}
       {showMobileMessages && (
-        <div className="md:hidden fixed inset-0 z-50 flex">
-          <div className="flex-1 bg-black/60" onClick={() => setShowMobileMessages(false)} />
-          <div className="w-[280px] h-full bg-[#121212] flex flex-col overflow-hidden shadow-2xl">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 flex-shrink-0">
-              <span className="text-white font-semibold text-sm">Messages</span>
-              <button onClick={() => setShowMobileMessages(false)} className="text-[#B3B3B3] hover:text-white transition-colors">
-                <X size={18} />
-              </button>
-            </div>
+        <div className="md:hidden fixed inset-0 z-50 bg-[#121212] flex flex-col">
+          <div className="flex items-center gap-3 px-4 py-3 border-b border-white/10 flex-shrink-0">
+            <button onClick={() => setShowMobileMessages(false)} className="text-[#B3B3B3] hover:text-white transition-colors">
+              <X size={22} />
+            </button>
+            <span className="text-white font-bold text-base">Messages</span>
+          </div>
+          <div className="flex-1 overflow-hidden">
             <FriendsDmPanel
               selected={selectedEntity}
               onSelect={(e) => { setSelectedEntity(e); setShowMobileMessages(false) }}

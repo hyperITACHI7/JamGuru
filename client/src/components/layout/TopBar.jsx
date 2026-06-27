@@ -34,12 +34,11 @@ export default function TopBar({ transparent = false, showNav = true, rightExtra
 
       {/* Right controls */}
       <div className="flex items-center gap-3">
-        {rightExtra}
-        <button className="bg-white text-black text-xs font-bold px-4 py-1.5 rounded-full hover:scale-105 transition-transform">
+        <button className="hidden md:block bg-white text-black text-xs font-bold px-4 py-1.5 rounded-full hover:scale-105 transition-transform">
           Upgrade
         </button>
 
-        <button className="text-[#B3B3B3] hover:text-white transition-colors">
+        <button className="hidden md:block text-[#B3B3B3] hover:text-white transition-colors">
           <Bell size={18} />
         </button>
 
@@ -50,10 +49,12 @@ export default function TopBar({ transparent = false, showNav = true, rightExtra
           <div className="w-7 h-7 rounded-full bg-[#535353] flex items-center justify-center text-white text-xs font-bold">
             {user.displayName?.[0]?.toUpperCase() ?? <User size={14} />}
           </div>
-          <span className="text-white text-sm font-semibold max-w-[100px] truncate">
+          <span className="hidden md:inline text-white text-sm font-semibold max-w-[100px] truncate">
             {user.displayName || 'Profile'}
           </span>
         </button>
+
+        {rightExtra}
       </div>
     </div>
   )
