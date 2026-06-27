@@ -43,7 +43,7 @@ function Bubble({ msg, onLike, justLiked }) {
     <div className={`flex ${isSent ? 'justify-end' : 'justify-start'} mb-4 px-4`}>
       <div className={`max-w-[72%] rounded-2xl p-3 ${
         isSent ? 'bg-[#1DB954]/15 rounded-tr-sm' : 'bg-[#282828] rounded-tl-sm'
-      } ${reaction ? 'opacity-60' : ''}`}>
+      } ${reaction === 'dislike' ? 'opacity-60' : ''}`}>
 
         {/* Song row */}
         <div className="flex items-center gap-2.5">

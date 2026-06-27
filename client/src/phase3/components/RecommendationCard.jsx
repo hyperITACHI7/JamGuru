@@ -62,7 +62,7 @@ export default function RecommendationCard({ rec: initialRec }) {
   }
 
   return (
-    <div className={`bg-[#1a1a1a] rounded-2xl p-4 hover:bg-[#222] transition-colors ${reaction ? 'opacity-50' : ''}`}>
+    <div className={`bg-[#1a1a1a] rounded-2xl p-4 hover:bg-[#222] transition-colors ${reaction === 'dislike' ? 'opacity-50' : ''}`}>
       <div className="flex gap-4">
         {/* Album art */}
         <div className="w-16 h-16 flex-shrink-0 rounded-xl overflow-hidden bg-[#282828] shadow-md">
@@ -110,13 +110,13 @@ export default function RecommendationCard({ rec: initialRec }) {
           <div className="flex flex-col items-center">
             <button
               onClick={toggleLike}
-              disabled={liking || !!reaction}
+              disabled={liking || reaction === 'dislike'}
               title={rec.liked ? 'Unlike' : 'Like'}
               className={`w-9 h-9 rounded-full flex items-center justify-center transition-colors ${
                 rec.liked
                   ? 'text-[#1DB954] hover:text-red-400'
                   : 'text-[#B3B3B3] hover:text-white'
-              } ${(liking || reaction) ? 'opacity-50 cursor-not-allowed' : ''}`}
+              } ${(liking || reaction === 'dislike') ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
               <Heart size={16} fill={rec.liked ? 'currentColor' : 'none'} />
             </button>
