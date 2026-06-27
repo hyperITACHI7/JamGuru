@@ -900,8 +900,10 @@ export default function ConversationView({ friend, onBack }) {
         ) : (
           <div className="flex items-center gap-2">
             <button onClick={openRequestComposer}
-              className={`text-xs font-semibold flex-shrink-0 transition-colors ${
-                showRequest ? 'text-[#1DB954]' : 'text-[#535353] hover:text-[#B3B3B3]'
+              className={`text-xs font-semibold flex-shrink-0 px-3 py-1.5 rounded-full border transition-colors ${
+                showRequest
+                  ? 'bg-[#1DB954] border-[#1DB954] text-black'
+                  : 'bg-white/10 border-white/20 text-white hover:bg-white/15'
               }`}>
               Request a Song
             </button>
