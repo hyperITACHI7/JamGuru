@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { X, Link as LinkIcon, Check, Loader, Music } from 'lucide-react'
+import { X, Check, Loader, Music } from 'lucide-react'
 import { importPlaylist } from '../api/auth'
 
 export default function ImportPlaylistModal({ onClose, onImported }) {
@@ -83,7 +83,6 @@ export default function ImportPlaylistModal({ onClose, onImported }) {
 
             {/* URL input */}
             <div className="flex items-center gap-2 bg-[#282828] rounded-xl px-4 py-3 mb-4 ring-1 ring-transparent focus-within:ring-[#1DB954]/40 transition-all">
-              <LinkIcon size={15} className="text-[#535353] flex-shrink-0" />
               <input
                 value={url}
                 onChange={e => setUrl(e.target.value)}
