@@ -58,11 +58,13 @@ router.get('/browse/new-releases', authMiddleware, async (req, res) => {
 
 // ── GET /api/songs/:spotifyId/friend-matches ──────────────────────────────────
 // Returns the current user's friends sorted by taste compatibility with the song.
-// Score = overlapping tags / total unique song tags * 100 (0–100).
+// Priority signals (strongest first):
+//   1. Friend already liked this exact song → score pinned to 100
+//   2. Tag overlap between song.lastFmTags and friend taste profile (0–100)
 router.get('/:spotifyId/friend-matches', authMiddleware, async (req, res) => {
   const { spotifyId } = req.params;
   try {
-    const [song, friendships] = await Promise.all([
+    const [song, friendships, directLikers, recLikers] = await Promise.all([
       prisma.song.findUnique({ where: { spotifyId }, select: { lastFmTags: true } }),
       prisma.friendship.findMany({
         where: {
@@ -84,12 +86,39 @@ router.get('/:spotifyId/friend-matches', authMiddleware, async (req, res) => {
           },
         },
       }),
+      // Friends who directly liked this song
+      prisma.songLike.findMany({
+        where: { spotifyId },
+        select: { userId: true },
+      }),
+      // Friends who liked a recommendation of this song
+      prisma.like.findMany({
+        where: { recommendation: { songId: spotifyId } },
+        select: { likerId: true },
+      }),
+    ]);
+
+    // Build a set of user IDs who have already liked this song in any form
+    const alreadyLiked = new Set([
+      ...directLikers.map(l => l.userId),
+      ...recLikers.map(l => l.likerId),
     ]);
 
     const songTags = (song?.lastFmTags ?? []).map(t => t.toLowerCase());
 
     const friends = friendships.map(f => {
       const friend = f.requesterId === req.userId ? f.addressee : f.requester;
+
+      // Strongest signal: friend already liked this exact song
+      if (alreadyLiked.has(friend.id)) {
+        return {
+          id: friend.id, username: friend.username,
+          displayName: friend.displayName, avatarUrl: friend.avatarUrl,
+          matchScore: 100, hasLiked: true,
+        };
+      }
+
+      // Fallback: tag overlap with taste profile
       const tasteTags = [
         ...(friend.tasteGenres  ?? []),
         ...(friend.tasteMoods   ?? []),
@@ -102,11 +131,9 @@ router.get('/:spotifyId/friend-matches', authMiddleware, async (req, res) => {
         : 0;
 
       return {
-        id:          friend.id,
-        username:    friend.username,
-        displayName: friend.displayName,
-        avatarUrl:   friend.avatarUrl,
-        matchScore,
+        id: friend.id, username: friend.username,
+        displayName: friend.displayName, avatarUrl: friend.avatarUrl,
+        matchScore, hasLiked: false,
       };
     });
 

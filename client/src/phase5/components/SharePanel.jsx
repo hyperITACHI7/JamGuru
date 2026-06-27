@@ -289,9 +289,13 @@ function FriendsTab({ activeSong, onSongChange, onClose }) {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-white text-sm font-medium truncate">{f.displayName}</p>
-                      <p className="text-[#B3B3B3] text-xs truncate">@{f.username}</p>
+                      <p className="text-[#B3B3B3] text-xs truncate">
+                        {f.hasLiked ? 'Already liked this song' : `@${f.username}`}
+                      </p>
                     </div>
-                    <span className="text-[#1DB954] text-[10px] font-bold flex-shrink-0">{f.matchScore}%</span>
+                    <span className="text-[#1DB954] text-[10px] font-bold flex-shrink-0">
+                      {f.hasLiked ? '❤' : `${f.matchScore}%`}
+                    </span>
                     <div className={`w-4 h-4 rounded-full border flex items-center justify-center flex-shrink-0 ml-1 transition-colors ${
                       aiSelected.has(f.id) ? 'bg-[#1DB954] border-[#1DB954]' : 'border-[#535353]'
                     }`}>
