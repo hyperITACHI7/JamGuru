@@ -174,29 +174,37 @@ router.post('/import-playlist', authMiddleware, async (req, res) => {
   const playlistId = match[1];
 
   try {
-    // Prefer user's Spotify token — can access private playlists
-    let token;
     const user = await prisma.user.findUnique({ where: { id: req.userId } });
-    if (user?.spotifyAccessToken) {
-      token = user.spotifyAccessToken;
-    } else {
-      token = await spotifyAuth.getClientCredentialsToken();
+
+    // Helper: try fetching tracks with a given token, refresh user token on 401
+    async function fetchTracks(token, isUserToken) {
+      try {
+        return await spotifyAuth.getPlaylistTracks(playlistId, token);
+      } catch (err) {
+        const status = err.response?.status;
+        console.error(`[import-playlist] Spotify ${status} (${isUserToken ? 'user token' : 'client creds'}):`, err.response?.data || err.message);
+        if (status === 401 && isUserToken && user?.spotifyRefreshToken) {
+          const newToken = await spotifyAuth.refreshAccessToken(user.spotifyRefreshToken);
+          await prisma.user.update({ where: { id: req.userId }, data: { spotifyAccessToken: newToken } });
+          return spotifyAuth.getPlaylistTracks(playlistId, newToken);
+        }
+        throw err;
+      }
     }
 
     let tracks;
-    try {
-      tracks = await spotifyAuth.getPlaylistTracks(playlistId, token);
-    } catch (err) {
-      // Token expired — refresh and retry
-      if (err.response?.status === 401 && user?.spotifyRefreshToken) {
-        token = await spotifyAuth.refreshAccessToken(user.spotifyRefreshToken);
-        await prisma.user.update({ where: { id: req.userId }, data: { spotifyAccessToken: token } });
-        tracks = await spotifyAuth.getPlaylistTracks(playlistId, token);
-      } else if (err.response?.status === 403 || err.response?.status === 404) {
-        return res.status(400).json({ error: 'Playlist not found or is private. Make sure the playlist is set to Public in Spotify.' });
-      } else {
-        throw err;
+    // Try user token first, then fall back to client credentials
+    if (user?.spotifyAccessToken) {
+      try {
+        tracks = await fetchTracks(user.spotifyAccessToken, true);
+      } catch (err) {
+        console.error('[import-playlist] User token failed, trying client credentials:', err.response?.status);
+        const ccToken = await spotifyAuth.getClientCredentialsToken();
+        tracks = await fetchTracks(ccToken, false);
       }
+    } else {
+      const ccToken = await spotifyAuth.getClientCredentialsToken();
+      tracks = await fetchTracks(ccToken, false);
     }
 
     if (tracks.length === 0) {
@@ -259,11 +267,10 @@ router.post('/import-playlist', authMiddleware, async (req, res) => {
 
     res.json({ imported: tracks.length, added });
   } catch (err) {
-    console.error('Import playlist error:', err.message);
-    if (err.response?.status === 404) {
-      return res.status(404).json({ error: 'Playlist not found or is private' });
-    }
-    res.status(502).json({ error: 'Could not import playlist. Check the URL and try again.' });
+    const status = err.response?.status;
+    const spotifyMsg = err.response?.data?.error?.message || err.response?.data?.error || err.message;
+    console.error(`[import-playlist] Final error ${status}:`, spotifyMsg);
+    res.status(502).json({ error: `Import failed (${status ?? 'network'}): ${spotifyMsg}` });
   }
 });
 
