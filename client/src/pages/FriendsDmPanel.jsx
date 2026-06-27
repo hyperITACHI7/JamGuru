@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom'
 import { getFriends } from '../phase3/api/friends'
 import { getGroups } from '../phase5/api/groups'
 
-export default function FriendsDmPanel({ selected, onSelect }) {
+export default function FriendsDmPanel({ selected, onSelect, className = '' }) {
   const [tab, setTab]         = useState('friends')
   const [friends, setFriends] = useState([])
   const [groups, setGroups]   = useState([])
@@ -33,7 +33,7 @@ export default function FriendsDmPanel({ selected, onSelect }) {
   const isGroupSelected  = (g) => selected?.type === 'group'  && selected?.data?.id === g.id
 
   return (
-    <div className="w-[240px] flex-shrink-0 border-l border-white/5 flex flex-col overflow-hidden">
+    <div className={`w-[240px] flex-shrink-0 border-l border-white/5 flex flex-col overflow-hidden ${className}`}>
 
       {/* Tab switcher */}
       <div className="px-3 pt-3 pb-0 flex-shrink-0">

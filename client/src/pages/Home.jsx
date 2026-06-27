@@ -258,10 +258,14 @@ export default function Home() {
           <p className="text-[#B3B3B3] text-sm py-8">Could not load songs. Check your connection.</p>
         ) : (
           <div className="space-y-8">
-            {/* Quick picks */}
+            {/* Quick picks — 1 column on mobile (3 items), 3 columns on desktop (6 items) */}
             {quickPicks.length > 0 && (
-              <div className="grid grid-cols-2 gap-2 mb-8 md:grid-cols-3">
-                {quickPicks.map(song => <QuickPickCard key={song.spotifyId} song={song} />)}
+              <div className="grid grid-cols-1 gap-2 mb-8 md:grid-cols-3">
+                {quickPicks.map((song, i) => (
+                  <div key={song.spotifyId} className={i >= 3 ? 'hidden md:block' : ''}>
+                    <QuickPickCard song={song} />
+                  </div>
+                ))}
               </div>
             )}
 
