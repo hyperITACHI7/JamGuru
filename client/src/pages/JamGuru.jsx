@@ -1,0 +1,186 @@
+import { useState, useEffect, useCallback } from 'react'
+import { Crown, UserPlus, RefreshCw } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import TopBar from '../components/layout/TopBar'
+import RecommendationCard from '../phase3/components/RecommendationCard'
+import JamGuruCard from '../phase4/components/JamGuruCard'
+import FriendsDmPanel from './FriendsDmPanel'
+import ConversationView from './ConversationView'
+import GroupConversationView from './GroupConversationView'
+import { getInbox } from '../phase3/api/recommendations'
+import { getJamGuruCount } from '../phase4/api/jamguru'
+
+export default function JamGuru() {
+  const [inbox, setInbox]                     = useState([])
+  const [loading, setLoading]                 = useState(true)
+  const [refreshing, setRefreshing]           = useState(false)
+  const [error, setError]                     = useState(null)
+  const [sort, setSort]                       = useState('latest')
+  const [jamGuruForCount, setJamGuruForCount] = useState(0)
+  // selectedEntity: null | { type: 'friend'|'group', data: {...} }
+  const [selectedEntity, setSelectedEntity]   = useState(null)
+
+  const fetchJamGuruCount = useCallback(() => {
+    getJamGuruCount()
+      .then(({ data }) => setJamGuruForCount(data.count))
+      .catch(() => {})
+  }, [])
+
+  const fetchInbox = useCallback((currentSort, isRefresh = false) => {
+    if (isRefresh) { setRefreshing(true); fetchJamGuruCount() }
+    else setLoading(true)
+    setError(null)
+    getInbox(currentSort)
+      .then(({ data }) => setInbox(data))
+      .catch(() => setError('Could not load inbox'))
+      .finally(() => { setLoading(false); setRefreshing(false) })
+  }, [fetchJamGuruCount])
+
+  useEffect(() => {
+    fetchJamGuruCount()
+    fetchInbox(sort)
+  }, [sort, fetchInbox, fetchJamGuruCount])
+
+  return (
+    <div className="flex flex-col h-full overflow-hidden">
+      {/* Gradient header — full width */}
+      <div className="relative flex-shrink-0">
+        <div className="absolute inset-0 bg-gradient-to-b from-emerald-900/70 via-[#121212]/60 to-transparent pointer-events-none" />
+        <TopBar transparent />
+      </div>
+
+      {/* 2-column body */}
+      <div className="flex flex-1 min-h-0 overflow-hidden">
+
+        {/* Middle — inbox feed or conversation */}
+        <div className="flex-1 overflow-hidden">
+          {selectedEntity?.type === 'friend' ? (
+            <ConversationView
+              friend={selectedEntity.data}
+              onBack={() => setSelectedEntity(null)}
+            />
+          ) : selectedEntity?.type === 'group' ? (
+            <GroupConversationView
+              group={selectedEntity.data}
+              onBack={() => setSelectedEntity(null)}
+            />
+          ) : (
+            <div className="h-full overflow-y-auto px-6 pb-8">
+
+              {/* Page heading */}
+              <div className="flex items-end gap-6 mb-8 mt-4">
+                <div className="w-28 h-28 rounded-xl bg-gradient-to-br from-[#1DB954] to-emerald-700 flex items-center justify-center shadow-xl shadow-green-900/40 flex-shrink-0">
+                  <Crown size={46} className="text-black fill-black" />
+                </div>
+                <div>
+                  <p className="text-[#B3B3B3] text-xs font-bold uppercase tracking-widest mb-1">Feature</p>
+                  <h1 className="text-white font-black text-3xl mb-2">Discovery Inbox</h1>
+                  <p className="text-[#B3B3B3] text-sm">
+                    Share songs with friends. Get credit when they love it.{' '}
+                    <span className="text-[#1DB954] font-medium">Become their JamGuru.</span>
+                  </p>
+                  <p className="text-[#B3B3B3] text-sm mt-1">
+                    JamGuru for{' '}
+                    <span className="text-white font-semibold">{jamGuruForCount}</span> listeners this month
+                  </p>
+                </div>
+              </div>
+
+              {/* JamGuru card */}
+              <JamGuruCard />
+
+              {/* Loading */}
+              {loading && (
+                <div className="text-center py-16">
+                  <p className="text-[#B3B3B3] text-sm">Loading your inbox…</p>
+                </div>
+              )}
+
+              {/* Error */}
+              {error && (
+                <div className="text-center py-16">
+                  <p className="text-red-400 text-sm">{error}</p>
+                </div>
+              )}
+
+              {/* Empty */}
+              {!loading && !error && inbox.length === 0 && (
+                <div className="text-center py-16">
+                  <div className="w-20 h-20 rounded-full bg-[#282828] flex items-center justify-center mx-auto mb-5">
+                    <Crown size={32} className="text-[#B3B3B3]" />
+                  </div>
+                  <h2 className="text-white font-bold text-xl mb-2">Your inbox is empty</h2>
+                  <p className="text-[#B3B3B3] text-sm max-w-sm mx-auto leading-relaxed mb-6">
+                    Add friends and ask them to share songs with you. Every recommendation appears here.
+                  </p>
+                  <div className="flex items-center justify-center gap-3">
+                    <Link
+                      to="/friends"
+                      className="inline-flex items-center gap-2 bg-white text-black font-bold px-6 py-3 rounded-full hover:scale-105 transition-transform"
+                    >
+                      <UserPlus size={16} />
+                      Find Friends
+                    </Link>
+                    <button
+                      onClick={() => fetchInbox(sort, true)}
+                      disabled={refreshing}
+                      className="inline-flex items-center gap-2 bg-[#282828] text-white font-bold px-5 py-3 rounded-full hover:bg-[#3e3e3e] transition-colors disabled:opacity-40"
+                    >
+                      <RefreshCw size={15} className={refreshing ? 'animate-spin' : ''} />
+                      Refresh
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Inbox list */}
+              {!loading && !error && inbox.length > 0 && (
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-white font-bold text-lg">
+                      All Recommendations
+                      <span className="text-[#B3B3B3] font-normal text-sm ml-3">
+                        {inbox.length} song{inbox.length !== 1 ? 's' : ''}
+                      </span>
+                    </h2>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => fetchInbox(sort, true)}
+                        disabled={refreshing}
+                        title="Refresh inbox"
+                        className="text-[#B3B3B3] hover:text-white transition-colors disabled:opacity-40 p-1"
+                      >
+                        <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
+                      </button>
+                      <div className="flex gap-1 bg-[#1a1a1a] rounded-full p-1">
+                        {[['latest', 'Latest'], ['score', 'By Score']].map(([val, label]) => (
+                          <button
+                            key={val}
+                            onClick={() => setSort(val)}
+                            className={`px-4 py-1 rounded-full text-xs font-bold transition-colors ${
+                              sort === val ? 'bg-white text-black' : 'text-[#B3B3B3] hover:text-white'
+                            }`}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="space-y-3">
+                    {inbox.map(rec => (
+                      <RecommendationCard key={rec.id} rec={rec} />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Right — friends/groups DM panel */}
+        <FriendsDmPanel selected={selectedEntity} onSelect={setSelectedEntity} />
+      </div>
+    </div>
+  )
+}

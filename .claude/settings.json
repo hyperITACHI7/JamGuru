@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(Get-Process -Name \"node\" -ErrorAction SilentlyContinue | Stop-Process -Force; Start-Sleep -Milliseconds 700; Start-Process -FilePath \"node\" -ArgumentList \"index.js\" -WorkingDirectory \"c:\\\\Users\\\\anshs\\\\OneDrive\\\\Documents\\\\BhibeChoding\\\\JamGuru\\\\server\" -RedirectStandardOutput \"$env:TEMP\\\\server.log\" -RedirectStandardError \"$env:TEMP\\\\server-err.log\" -WindowStyle Hidden; Start-Sleep -Milliseconds 2000; Get-Content \"$env:TEMP\\\\server.log\")",
+      "PowerShell(Get-Content \"$env:TEMP\\\\server-err.log\" -ErrorAction SilentlyContinue | Select-Object -Last 20)",
+      "PowerShell(Get-NetTCPConnection -LocalPort 3001,5173 -State Listen -ErrorAction SilentlyContinue)",
+      "PowerShell(Start-Process -FilePath \"node\" -ArgumentList \"index.js\" -WorkingDirectory \"c:\\\\Users\\\\anshs\\\\OneDrive\\\\Documents\\\\BhibeChoding\\\\JamGuru\\\\server\" -RedirectStandardOutput \"$env:TEMP\\\\server.log\" -RedirectStandardError \"$env:TEMP\\\\server-err.log\" -WindowStyle Hidden; Start-Sleep -Milliseconds 2000; Get-Content \"$env:TEMP\\\\server.log\")",
+      "PowerShell(Start-Process -FilePath \"cmd\" -ArgumentList \"/c cd `\"c:\\\\Users\\\\anshs\\\\OneDrive\\\\Documents\\\\BhibeChoding\\\\JamGuru\\\\client`\" && npm run dev\" -WindowStyle Hidden -RedirectStandardOutput \"$env:TEMP\\\\vite.log\" -RedirectStandardError \"$env:TEMP\\\\vite-err.log\"; Start-Sleep -Milliseconds 4000; Get-Content \"$env:TEMP\\\\vite.log\" | Select-String \"ready|error|Local\")",
+      "PowerShell($h = Invoke-WebRequest -Uri \"http://localhost:3001/api/health\" -UseBasicParsing; Write-Output \"Server: $\\($h.Content\\)\"; $v = Invoke-WebRequest -Uri \"http://localhost:5173\" -UseBasicParsing -ErrorAction SilentlyContinue; Write-Output \"Vite: $\\($v.StatusCode\\)\")",
+      "PowerShell(Get-Content \"$env:TEMP\\\\server-err.log\" -ErrorAction SilentlyContinue | Select-Object -Last 30)",
+      "PowerShell(Get-Content \"$env:TEMP\\\\vite-err.log\" -ErrorAction SilentlyContinue | Select-Object -Last 20)",
+      "PowerShell(Get-Content \"$env:TEMP\\\\vite.log\" -ErrorAction SilentlyContinue | Select-Object -Last 20)",
+      "PowerShell(Start-Process -FilePath \"cmd\" -ArgumentList \"/c cd `\"c:\\\\Users\\\\anshs\\\\OneDrive\\\\Documents\\\\BhibeChoding\\\\JamGuru\\\\server`\" && npx nodemon index.js\" -WindowStyle Hidden -RedirectStandardOutput \"$env:TEMP\\\\server.log\" -RedirectStandardError \"$env:TEMP\\\\server-err.log\"; Start-Sleep -Milliseconds 3000; Get-Content \"$env:TEMP\\\\server.log\" | Select-String \"running|error|crash\" | Select-Object -First 5)",
+      "PowerShell(Start-Process -FilePath \"cmd\" -ArgumentList \"/c cd `\"c:\\\\Users\\\\anshs\\\\OneDrive\\\\Documents\\\\BhibeChoding\\\\JamGuru\\\\client`\" && npm run dev\" -WindowStyle Hidden -RedirectStandardOutput \"$env:TEMP\\\\vite.log\" -RedirectStandardError \"$env:TEMP\\\\vite-err.log\"; Start-Sleep -Milliseconds 3000; Get-Content \"$env:TEMP\\\\vite.log\" | Select-String \"ready|Local|error\")",
+      "PowerShell(Start-Sleep -Milliseconds 1500; $s = Invoke-WebRequest \"http://localhost:3001/api/health\" -UseBasicParsing; Write-Output \"Server: $\\($s.StatusCode\\)\"; Get-Content \"$env:TEMP\\\\server.log\" | Select-Object -Last 4)",
+      "PowerShell(Start-Sleep -Milliseconds 1500; Get-Content \"$env:TEMP\\\\server.log\" | Select-Object -Last 3)",
+      "Bash(node -e ' *)",
+      "PowerShell(Start-Process powershell -ArgumentList '-NoExit', '-Command', 'cd \"C:\\\\Users\\\\anshs\\\\OneDrive\\\\Documents\\\\BhibeChoding\\\\JamGuru\\\\server\"; npm run dev' -WindowStyle Normal)"
+    ]
+  }
+}

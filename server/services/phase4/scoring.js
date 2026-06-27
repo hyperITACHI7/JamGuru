@@ -1,0 +1,90 @@
+// All score recalculation logic for Phase 4.
+// Called after every like or unlike — always recomputes from source-of-truth counts
+// so scores stay consistent even if events arrive out of order.
+
+const FEEDBACK_TAGS = [
+  'Great vocals', 'Gym song', 'Nostalgic', 'Amazing lyrics',
+  'Road trip vibe', 'Late night', 'Happy vibes',
+];
+
+function todayDate() {
+  return new Date(new Date().toISOString().slice(0, 10));
+}
+
+function thisMonthStart() {
+  return new Date(new Date().toISOString().slice(0, 7) + '-01');
+}
+
+// Recompute all scores affected by a like or unlike on `recommendationId`.
+// Safe to call after the like row is already inserted or deleted.
+async function recomputeScores(prisma, { recommendationId, likerId }) {
+  const rec = await prisma.recommendation.findUnique({ where: { id: recommendationId } });
+  const senderId = rec.senderId;
+  const today      = todayDate();
+  const monthStart = thisMonthStart();
+
+  // ── 1. Sender's daily_score for today ──────────────────────────────────────
+
+  // Count actual likes sender received today (from all recommendations they sent)
+  const likesReceivedToday = await prisma.like.count({
+    where: {
+      recommendation: { senderId },
+      likedAt: { gte: today },
+    },
+  });
+
+  const senderDaily = await prisma.dailyScore.findUnique({
+    where: { userId_scoreDate: { userId: senderId, scoreDate: today } },
+  });
+
+  const recsSentToday = senderDaily ? Number(senderDaily.recsSent) : 0;
+  const dailyScore    = recsSentToday > 0 ? likesReceivedToday / recsSentToday : 0;
+
+  await prisma.dailyScore.upsert({
+    where: { userId_scoreDate: { userId: senderId, scoreDate: today } },
+    create: { userId: senderId, scoreDate: today, likesReceived: likesReceivedToday, recsSent: recsSentToday, dailyScore },
+    update: { likesReceived: likesReceivedToday, dailyScore },
+  });
+
+  // ── 2. Sender's monthly_score ───────────────────────────────────────────────
+
+  const monthEnd = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0);
+
+  const allDailyScores = await prisma.dailyScore.findMany({
+    where: { userId: senderId, scoreDate: { gte: monthStart, lte: monthEnd } },
+  });
+
+  const monthlyScore = allDailyScores.reduce((sum, d) => sum + Number(d.dailyScore), 0);
+
+  await prisma.monthlyScore.upsert({
+    where: { userId_month: { userId: senderId, month: monthStart } },
+    create: { userId: senderId, month: monthStart, monthlyScore },
+    update: { monthlyScore },
+  });
+
+  // ── 3. Personal trust ranking: liker → sender ──────────────────────────────
+
+  // How many of sender's recs to liker did liker like this month?
+  const likesGiven = await prisma.like.count({
+    where: {
+      likerId,
+      recommendation: { senderId, recipientId: likerId },
+      likedAt: { gte: monthStart },
+    },
+  });
+
+  // How many recs has sender sent to liker this month?
+  const recsReceived = await prisma.recommendation.count({
+    where: { senderId, recipientId: likerId, sentAt: { gte: monthStart } },
+  });
+
+  const trustScore = recsReceived > 0 ? likesGiven / recsReceived : 0;
+
+  await prisma.personalTrustRanking.upsert({
+    where: { ownerId_friendId_month: { ownerId: likerId, friendId: senderId, month: monthStart } },
+    create: { ownerId: likerId, friendId: senderId, month: monthStart, likesGiven, recsReceived, trustScore },
+    update: { likesGiven, recsReceived, trustScore },
+  });
+}
+
+module.exports = { recomputeScores, FEEDBACK_TAGS, todayDate, thisMonthStart };

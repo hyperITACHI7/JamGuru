@@ -1,0 +1,217 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                  String   @id @default(uuid())
+  username            String   @unique
+  displayName         String   @map("display_name")
+  password            String?
+  avatarUrl           String?  @map("avatar_url")
+  bio                 String?
+  createdAt           DateTime @default(now()) @map("created_at")
+  spotifyUserId       String?  @unique @map("spotify_user_id")
+  spotifyAccessToken  String?  @map("spotify_access_token")
+  spotifyRefreshToken String?  @map("spotify_refresh_token")
+
+  // Taste profile — AI-maintained + user-editable
+  tasteGenres      String[]  @default([]) @map("taste_genres")
+  tasteMoods       String[]  @default([]) @map("taste_moods")
+  tasteArtists     String[]  @default([]) @map("taste_artists")
+  tasteEras        String[]  @default([]) @map("taste_eras")
+  tastePinned      Json      @default("{}") @map("taste_pinned")
+  tasteUpdatedAt   DateTime? @map("taste_updated_at")
+
+  sentFriendRequests      Friendship[]           @relation("FriendshipRequester")
+  receivedFriendRequests  Friendship[]           @relation("FriendshipAddressee")
+  sentRecommendations     Recommendation[]       @relation("RecSender")
+  receivedRecommendations Recommendation[]       @relation("RecRecipient")
+  dailyScores             DailyScore[]
+  likesGiven              Like[]                 @relation("LikeGiver")
+  monthlyScores           MonthlyScore[]
+  trustRankingsAsOwner    PersonalTrustRanking[] @relation("TrustOwner")
+  trustRankingsAsFriend   PersonalTrustRanking[] @relation("TrustFriend")
+  groupsCreated           Group[]                @relation("GroupCreator")
+  groupMemberships        GroupMember[]
+  songLikes               SongLike[]
+
+  @@map("users")
+}
+
+model Song {
+  spotifyId   String   @id @map("spotify_id")
+  title       String
+  artist      String
+  album       String
+  albumArtUrl String?  @map("album_art_url")
+  previewUrl  String?  @map("preview_url")
+  cachedAt    DateTime @default(now()) @map("cached_at")
+  lastFmTags  String[] @default([]) @map("lastfm_tags")
+
+  recommendations Recommendation[]
+  songLikes       SongLike[]
+
+  @@map("songs")
+}
+
+model SongLike {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  spotifyId String   @map("spotify_id")
+  likedAt   DateTime @default(now()) @map("liked_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  song Song @relation(fields: [spotifyId], references: [spotifyId], onDelete: Cascade)
+
+  @@unique([userId, spotifyId])
+  @@map("song_likes")
+}
+
+enum FriendshipStatus {
+  PENDING
+  ACCEPTED
+}
+
+model Friendship {
+  id          String           @id @default(uuid())
+  requesterId String           @map("requester_id")
+  addresseeId String           @map("addressee_id")
+  status      FriendshipStatus @default(PENDING)
+  createdAt   DateTime         @default(now()) @map("created_at")
+
+  requester User @relation("FriendshipRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+  addressee User @relation("FriendshipAddressee", fields: [addresseeId], references: [id], onDelete: Cascade)
+
+  @@unique([requesterId, addresseeId])
+  @@map("friendships")
+}
+
+model Recommendation {
+  id          String   @id @default(uuid())
+  senderId    String   @map("sender_id")
+  recipientId String?  @map("recipient_id")
+  groupId     String?  @map("group_id")
+  songId      String   @map("song_id")
+  context     String?
+  sentAt      DateTime @default(now()) @map("sent_at")
+
+  sender    User   @relation("RecSender",    fields: [senderId],    references: [id], onDelete: Cascade)
+  recipient User?  @relation("RecRecipient", fields: [recipientId], references: [id], onDelete: SetNull)
+  group     Group? @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  song      Song   @relation(fields: [songId], references: [spotifyId])
+  likes     Like[]
+
+  @@map("recommendations")
+}
+
+model Like {
+  id               String   @id @default(uuid())
+  recommendationId String   @map("recommendation_id")
+  likerId          String   @map("liker_id")
+  likedAt          DateTime @default(now()) @map("liked_at")
+
+  recommendation Recommendation @relation(fields: [recommendationId], references: [id], onDelete: Cascade)
+  liker          User           @relation("LikeGiver", fields: [likerId], references: [id], onDelete: Cascade)
+  feedbacks      LikeFeedback[]
+
+  @@unique([recommendationId, likerId])
+  @@map("likes")
+}
+
+model LikeFeedback {
+  id     String @id @default(uuid())
+  likeId String @map("like_id")
+  tag    String
+
+  like Like @relation(fields: [likeId], references: [id], onDelete: Cascade)
+
+  @@map("like_feedback")
+}
+
+model DailyScore {
+  id            String   @id @default(uuid())
+  userId        String   @map("user_id")
+  scoreDate     DateTime @map("score_date") @db.Date
+  likesReceived Int      @default(0) @map("likes_received")
+  recsSent      Int      @default(0) @map("recs_sent")
+  dailyScore    Decimal  @default(0) @map("daily_score") @db.Decimal(6, 4)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, scoreDate])
+  @@map("daily_scores")
+}
+
+model MonthlyScore {
+  id           String   @id @default(uuid())
+  userId       String   @map("user_id")
+  month        DateTime @map("month") @db.Date
+  monthlyScore Decimal  @default(0) @map("monthly_score") @db.Decimal(10, 4)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, month])
+  @@map("monthly_scores")
+}
+
+model PersonalTrustRanking {
+  id           String   @id @default(uuid())
+  ownerId      String   @map("owner_id")
+  friendId     String   @map("friend_id")
+  month        DateTime @map("month") @db.Date
+  likesGiven   Int      @default(0) @map("likes_given")
+  recsReceived Int      @default(0) @map("recs_received")
+  trustScore   Decimal  @default(0) @map("trust_score") @db.Decimal(10, 4)
+
+  owner  User @relation("TrustOwner",  fields: [ownerId],  references: [id], onDelete: Cascade)
+  friend User @relation("TrustFriend", fields: [friendId], references: [id], onDelete: Cascade)
+
+  @@unique([ownerId, friendId, month])
+  @@map("personal_trust_rankings")
+}
+
+model Group {
+  id        String   @id @default(uuid())
+  name      String
+  createdBy String   @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  creator         User             @relation("GroupCreator", fields: [createdBy], references: [id], onDelete: Cascade)
+  members         GroupMember[]
+  groupScores     GroupScore[]
+  recommendations Recommendation[]
+
+  @@map("groups")
+}
+
+model GroupMember {
+  groupId  String   @map("group_id")
+  userId   String   @map("user_id")
+  joinedAt DateTime @default(now()) @map("joined_at")
+
+  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId],  references: [id], onDelete: Cascade)
+
+  @@id([groupId, userId])
+  @@map("group_members")
+}
+
+model GroupScore {
+  id            String   @id @default(uuid())
+  groupId       String   @map("group_id")
+  scoreDate     DateTime @map("score_date") @db.Date
+  likesReceived Int      @default(0) @map("likes_received")
+  recsSent      Int      @default(0) @map("recs_sent")
+  groupSize     Int      @default(0) @map("group_size")
+  dailyScore    Decimal  @default(0) @map("daily_score") @db.Decimal(10, 4)
+
+  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, scoreDate])
+  @@map("group_scores")
+}
