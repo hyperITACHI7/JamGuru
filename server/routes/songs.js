@@ -64,24 +64,57 @@ router.get('/:spotifyId', authMiddleware, async (req, res) => {
     const cached = await prisma.song.findUnique({ where: { spotifyId } });
     const isStale = cached && (Date.now() - cached.cachedAt.getTime() > CACHE_TTL_MS);
 
+    // Fast path: fresh cache entry that already has a preview URL
     if (cached && !isStale && cached.previewUrl) {
       return res.json(cached);
     }
 
-    // Fetch fresh from Spotify
-    const track = await spotify.getTrack(spotifyId);
-    await prisma.song.upsert({
-      where: { spotifyId },
-      create: { ...track, cachedAt: new Date() },
-      update: { ...track, cachedAt: new Date() },
-    });
-    res.json(track);
-  } catch (err) {
-    if (err.response?.status === 404) {
-      return res.status(404).json({ error: 'Song not found' });
+    // iTunes IDs are purely numeric. Spotify IDs are alphanumeric (e.g. "4iV5W9uYEdYUVa79Axb7Rh").
+    // For non-numeric IDs (Spotify-synced songs), the iTunes /lookup endpoint will return
+    // nothing, so skip straight to the title+artist search fallback.
+    const isItunesId = /^\d+$/.test(spotifyId);
+
+    if (isItunesId) {
+      // Try a precise iTunes lookup first
+      try {
+        const track = await spotify.getTrack(spotifyId);
+        await prisma.song.upsert({
+          where: { spotifyId },
+          create: { ...track, cachedAt: new Date() },
+          update: { ...track, cachedAt: new Date() },
+        });
+        return res.json(track);
+      } catch (lookupErr) {
+        // Fall through to title+artist search if we have cached metadata
+        if (!cached) {
+          if (lookupErr.response?.status === 404) return res.status(404).json({ error: 'Song not found' });
+          throw lookupErr;
+        }
+      }
     }
+
+    // Fallback: search iTunes by title + artist to resolve a preview URL.
+    // This covers (a) Spotify-synced songs with non-numeric IDs and
+    // (b) iTunes songs whose preview URL expired or was never stored.
+    if (cached) {
+      try {
+        const results = await spotify.searchTracks(`${cached.title} ${cached.artist}`);
+        const match = results.find(r => r.previewUrl);
+        if (match?.previewUrl) {
+          await prisma.song.update({
+            where: { spotifyId },
+            data:  { previewUrl: match.previewUrl, cachedAt: new Date() },
+          });
+          return res.json({ ...cached, previewUrl: match.previewUrl });
+        }
+      } catch (_) { /* search failed — return what we have */ }
+      return res.json(cached);
+    }
+
+    return res.status(404).json({ error: 'Song not found' });
+  } catch (err) {
     console.error('Song fetch error:', err.message);
-    res.status(502).json({ error: 'Could not reach Spotify. Try again.' });
+    res.status(502).json({ error: 'Could not reach iTunes. Try again.' });
   }
 });
 
