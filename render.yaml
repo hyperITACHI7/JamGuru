@@ -11,10 +11,12 @@ services:
     plan: free
     buildCommand: >-
       cd server && npm install &&
-      DATABASE_URL=postgresql://placeholder npx prisma generate &&
+      DATABASE_URL=postgresql://user:pass@localhost:5432/placeholder npx prisma generate &&
       cd ../client && npm install && npm run build
     startCommand: cd server && npx prisma db push --accept-data-loss && node index.js
     envVars:
+      - key: NODE_VERSION
+        value: 20.19.0
       - key: NODE_ENV
         value: production
       - key: DATABASE_URL
@@ -33,12 +35,12 @@ services:
       # Last.fm
       - key: LASTFM_API_KEY
         sync: false
-      # AI / LLM — Groq (only AI_API_KEY must be set manually)
+      # AI / LLM provider
       - key: AI_PROVIDER
-        value: groq
-      - key: AI_BASE_URL
-        value: https://api.groq.com/openai/v1
-      - key: AI_MODEL
-        value: llama-3.3-70b-versatile
+        sync: false
       - key: AI_API_KEY
+        sync: false
+      - key: AI_BASE_URL
+        sync: false
+      - key: AI_MODEL
         sync: false

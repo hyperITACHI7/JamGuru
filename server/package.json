@@ -2,9 +2,12 @@
   "name": "jamguru-server",
   "version": "1.0.0",
   "main": "index.js",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "dev": "nodemon index.js",
-    "build": "DATABASE_URL=postgresql://placeholder npx prisma generate",
+    "build": "DATABASE_URL=postgresql://user:pass@localhost:5432/placeholder npx prisma generate",
     "start": "npx prisma db push --accept-data-loss && node index.js"
   },
   "dependencies": {
