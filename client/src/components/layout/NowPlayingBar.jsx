@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import {
   Heart, Shuffle, SkipBack, Play, Pause, SkipForward, Repeat,
-  Mic2, ListMusic, Monitor, Volume2, Maximize2, Music, Share2
+  Volume2, Music, Share2
 } from 'lucide-react'
 import { usePlayer } from '../../context/PlayerContext'
 import { isSongLiked, likeSong, unlikeSong } from '../../api/songs'
@@ -93,6 +93,15 @@ export default function NowPlayingBar() {
               : <Play  size={16} className="fill-black text-black" />
             }
           </button>
+
+          {/* Share */}
+          <button
+            onClick={() => track && setShareOpen(true)}
+            disabled={!track}
+            className={`flex-shrink-0 p-1 transition-colors disabled:opacity-30 ${track ? 'text-[#B3B3B3]' : 'text-[#535353]'}`}
+          >
+            <Share2 size={18} />
+          </button>
         </div>
       </footer>
 
@@ -174,11 +183,8 @@ export default function NowPlayingBar() {
           </div>
         </div>
 
-        {/* Right — extra controls */}
-        <div className="w-[280px] flex items-center justify-end gap-3 flex-shrink-0">
-          <button className="text-[#B3B3B3] hover:text-white transition-colors"><Mic2 size={16} /></button>
-          <button className="text-[#B3B3B3] hover:text-white transition-colors"><ListMusic size={16} /></button>
-          <button className="text-[#B3B3B3] hover:text-white transition-colors"><Monitor size={16} /></button>
+        {/* Right — share + volume only */}
+        <div className="w-[280px] flex items-center justify-end gap-4 flex-shrink-0">
           <button
             onClick={() => track && setShareOpen(true)}
             disabled={!track}
@@ -201,7 +207,6 @@ export default function NowPlayingBar() {
               <div className="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full shadow opacity-0 group-hover:opacity-100 transition-opacity" style={{ left: `calc(${volPct}% - 6px)` }} />
             </div>
           </div>
-          <button className="text-[#B3B3B3] hover:text-white transition-colors"><Maximize2 size={14} /></button>
         </div>
       </footer>
 

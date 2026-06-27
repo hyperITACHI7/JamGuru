@@ -22,6 +22,7 @@ export default function TopBar({ transparent = false, rightExtra = null }) {
   const user = JSON.parse(localStorage.getItem('user') || '{}')
 
   const parentRoute = getParentRoute(location.pathname)
+  const firstName = (user.displayName || '').split(' ')[0] || 'Profile'
 
   return (
     <div
@@ -51,14 +52,18 @@ export default function TopBar({ transparent = false, rightExtra = null }) {
           Upgrade
         </button>
 
-        {/* Profile — bare avatar on mobile, full pill on desktop */}
+        {/* Profile — avatar + first name on mobile, full name pill on desktop */}
         <button
           onClick={() => navigate('/profile')}
-          className="flex items-center md:gap-2 md:bg-[#282828] md:hover:bg-[#3E3E3E] md:rounded-full md:pl-1 md:pr-3 md:py-1 transition-colors"
+          className="flex items-center gap-2 bg-[#282828] hover:bg-[#3E3E3E] rounded-full pl-1 pr-3 py-1 transition-colors"
         >
-          <div className="w-8 h-8 rounded-full bg-[#535353] flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+          <div className="w-7 h-7 rounded-full bg-[#535353] flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
             {user.displayName?.[0]?.toUpperCase() ?? <User size={14} />}
           </div>
+          {/* mobile: first name only; desktop: full display name */}
+          <span className="md:hidden text-white text-sm font-semibold max-w-[80px] truncate">
+            {firstName}
+          </span>
           <span className="hidden md:inline text-white text-sm font-semibold max-w-[100px] truncate">
             {user.displayName || 'Profile'}
           </span>
