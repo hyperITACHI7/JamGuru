@@ -1,0 +1,44 @@
+databases:
+  - name: jamguru-db
+    databaseName: jamguru
+    user: jamguru
+    plan: free
+
+services:
+  - type: web
+    name: jamguru
+    env: node
+    plan: free
+    buildCommand: >-
+      cd server && npm install &&
+      DATABASE_URL=postgresql://placeholder npx prisma generate &&
+      cd ../client && npm install && npm run build
+    startCommand: cd server && npx prisma db push --accept-data-loss && node index.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: jamguru-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      # Spotify OAuth — set in Render dashboard after first deploy
+      - key: SPOTIFY_CLIENT_ID
+        sync: false
+      - key: SPOTIFY_CLIENT_SECRET
+        sync: false
+      - key: SPOTIFY_REDIRECT_URI
+        sync: false
+      # Last.fm
+      - key: LASTFM_API_KEY
+        sync: false
+      # AI / LLM provider
+      - key: AI_PROVIDER
+        sync: false
+      - key: AI_API_KEY
+        sync: false
+      - key: AI_BASE_URL
+        sync: false
+      - key: AI_MODEL
+        sync: false

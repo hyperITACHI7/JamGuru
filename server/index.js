@@ -1,6 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const path = require('path');
 
 const authRoutes        = require('./routes/auth');
 const spotifyAuthRoutes = require('./routes/spotifyAuth');
@@ -22,6 +23,7 @@ const allowedOrigins = [
   'http://localhost:5173',
   'http://localhost:5174',
   process.env.CLIENT_URL,
+  process.env.RENDER_EXTERNAL_URL,
 ].filter(Boolean);
 app.use(cors({ origin: allowedOrigins }));
 app.use(express.json());
@@ -42,6 +44,12 @@ app.use('/api/profile/taste',   tasteRoutes);     // /api/profile/taste GET/PATC
 app.get('/api/health', (_req, res) => res.json({ status: 'ok' }));
 
 scheduleMonthlyReset();
+
+if (process.env.NODE_ENV === 'production') {
+  const clientDist = path.join(__dirname, '../client/dist');
+  app.use(express.static(clientDist));
+  app.get('*', (_req, res) => res.sendFile(path.join(clientDist, 'index.html')));
+}
 
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => console.log(`JamGuru server running on http://localhost:${PORT}`));

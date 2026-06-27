@@ -43,7 +43,7 @@ router.get('/', (req, res) => {
 // Spotify redirects here after the user grants permission
 router.get('/callback', async (req, res) => {
   const { code, error } = req.query;
-  const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:5173';
+  const CLIENT_URL = process.env.CLIENT_URL || process.env.RENDER_EXTERNAL_URL || 'http://localhost:5173';
 
   if (error || !code) {
     return res.redirect(`${CLIENT_URL}/login?error=spotify_denied`);
