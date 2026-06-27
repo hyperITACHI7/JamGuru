@@ -149,10 +149,10 @@ async function getPlaylistTracks(playlistId, accessToken) {
   // Step 1: fetch playlist metadata + first 100 tracks via fields param.
   // This avoids the /tracks sub-endpoint which requires extended app permissions.
   const TRACK_FIELDS = 'name,description,images,tracks(items(track(id,name,type,artists(name),album(name,images(url)),preview_url)),total,next)';
-  const playlistRes = await axios.get(
-    `${API_BASE}/playlists/${playlistId}?fields=${encodeURIComponent(TRACK_FIELDS)}`,
-    { headers: { Authorization: `Bearer ${accessToken}` } }
-  );
+  const playlistRes = await axios.get(`${API_BASE}/playlists/${playlistId}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+    params: { fields: TRACK_FIELDS },
+  });
 
   const data = playlistRes.data;
   console.log('[getPlaylistTracks] tracks keys:', Object.keys(data.tracks || {}));
