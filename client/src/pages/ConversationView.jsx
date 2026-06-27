@@ -89,7 +89,7 @@ function Bubble({ msg, onLike, justLiked, requestText }) {
             isSent ? 'border-black/30 bg-black/10' : 'border-[#1DB954]/50 bg-[#1DB954]/5'
           }`}>
             <Reply size={9} className={`flex-shrink-0 mt-0.5 ${isSent ? 'text-black/40' : 'text-[#1DB954]/60'}`} />
-            <p className={`text-[11px] truncate italic min-w-0 ${isSent ? 'text-black/70' : 'text-white/75'}`}>
+            <p className={`text-[11px] truncate italic min-w-0 ${isSent ? 'text-white' : 'text-white/75'}`}>
               "{requestText}"
             </p>
           </div>
