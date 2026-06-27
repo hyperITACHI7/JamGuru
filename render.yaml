@@ -33,12 +33,12 @@ services:
       # Last.fm
       - key: LASTFM_API_KEY
         sync: false
-      # AI / LLM provider
+      # AI / LLM — Groq (only AI_API_KEY must be set manually)
       - key: AI_PROVIDER
-        sync: false
-      - key: AI_API_KEY
-        sync: false
+        value: groq
       - key: AI_BASE_URL
-        sync: false
+        value: https://api.groq.com/openai/v1
       - key: AI_MODEL
+        value: llama-3.3-70b-versatile
+      - key: AI_API_KEY
         sync: false
