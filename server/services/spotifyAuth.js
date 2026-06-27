@@ -178,15 +178,15 @@ async function getPlaylistTracksFromEmbed(playlistId) {
 
   const tracks = [];
   for (const item of (entity.trackList || [])) {
-    // trackList items have uid, id, title, subtitle (artist), album, isPlayable, etc.
-    const id = item?.id ?? item?.track?.id;
+    // trackList items use uri "spotify:track:<id>" instead of a bare id field
+    const id = item?.id ?? item?.track?.id ?? item?.uri?.split(':').pop();
     const title = item?.title ?? item?.track?.name ?? item?.name;
     const artist = item?.subtitle ?? (item?.artists || item?.track?.artists || []).map(a => a.name).join(', ');
     const albumName = item?.album?.name ?? item?.track?.album?.name ?? '';
     const albumArt = item?.album?.images?.[0]?.url ?? item?.track?.album?.images?.[0]?.url
       ?? item?.coverArt?.sources?.[0]?.url ?? null;
-    const preview = item?.preview_url ?? item?.track?.preview_url ?? null;
-    if (!id || !title) continue;
+    const preview = item?.audioPreview?.url ?? item?.preview_url ?? item?.track?.preview_url ?? null;
+    if (!id || !title || item?.uri?.includes(':episode:')) continue; // skip podcasts
     tracks.push({ spotifyId: id, title, artist: artist || '', album: albumName, albumArtUrl: albumArt, previewUrl: preview });
   }
 
