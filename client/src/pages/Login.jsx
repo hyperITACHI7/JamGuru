@@ -41,7 +41,7 @@ export default function Login() {
 
         {/* Spotify OAuth login */}
         <a
-          href="http://127.0.0.1:3001/api/auth/spotify"
+          href="/api/auth/spotify"
           className="w-full flex items-center justify-center gap-3 bg-[#1DB954] text-black font-bold py-3 rounded-full hover:bg-[#1ed760] transition-colors text-sm relative"
         >
           <svg viewBox="0 0 24 24" className="w-5 h-5 fill-black absolute left-4">
