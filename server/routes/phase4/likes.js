@@ -141,6 +141,52 @@ router.delete('/songs/:id/like', auth, async (req, res) => {
   }
 });
 
+// POST /api/recommendations/:id/dismiss — remove from inbox without algorithmic penalty
+router.post('/recommendations/:id/dismiss', auth, async (req, res) => {
+  try {
+    const rec = await prisma.recommendation.findUnique({ where: { id: req.params.id } });
+    if (!rec) return res.status(404).json({ error: 'Recommendation not found' });
+    if (rec.recipientId !== req.userId) return res.status(403).json({ error: 'Not your recommendation' });
+
+    await prisma.recommendation.update({
+      where: { id: req.params.id },
+      data: { dismissedAt: new Date(), dismissedById: req.userId },
+    });
+
+    res.json({ dismissed: true });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// POST /api/recommendations/:id/dislike — remove from inbox + feed negative signal to taste profile
+router.post('/recommendations/:id/dislike', auth, async (req, res) => {
+  try {
+    const rec = await prisma.recommendation.findUnique({ where: { id: req.params.id } });
+    if (!rec) return res.status(404).json({ error: 'Recommendation not found' });
+    if (rec.recipientId !== req.userId) return res.status(403).json({ error: 'Not your recommendation' });
+
+    await prisma.songDislike.upsert({
+      where: { userId_spotifyId: { userId: req.userId, spotifyId: rec.songId } },
+      create: { userId: req.userId, spotifyId: rec.songId },
+      update: {},
+    });
+
+    await prisma.recommendation.update({
+      where: { id: req.params.id },
+      data: { dismissedAt: new Date(), dismissedById: req.userId },
+    });
+
+    refreshTasteProfile(prisma, req.userId).catch(() => {});
+
+    res.json({ disliked: true });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // POST /api/likes/:id/feedback — attach/replace feedback tags on a like
 router.post('/likes/:id/feedback', auth, async (req, res) => {
   try {

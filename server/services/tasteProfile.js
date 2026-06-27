@@ -58,7 +58,7 @@ async function callAI(prompt) {
 async function refreshTasteProfile(prisma, userId) {
   // ── 1. Gather signals ──────────────────────────────────────────────────────
 
-  const [user, songLikes, feedbackTags] = await Promise.all([
+  const [user, songLikes, songDislikes, feedbackTags] = await Promise.all([
     prisma.user.findUnique({
       where:  { id: userId },
       select: { tastePinned: true },
@@ -68,6 +68,12 @@ async function refreshTasteProfile(prisma, userId) {
       include: { song: { select: { title: true, artist: true, lastFmTags: true } } },
       orderBy: { likedAt: 'desc' },
       take: 100,
+    }),
+    prisma.songDislike.findMany({
+      where:   { userId },
+      include: { song: { select: { title: true, artist: true, lastFmTags: true } } },
+      orderBy: { dislikedAt: 'desc' },
+      take: 50,
     }),
     prisma.likeFeedback.groupBy({
       by:      ['tag'],
@@ -89,6 +95,18 @@ async function refreshTasteProfile(prisma, userId) {
   const topArtists = Object.entries(artistCounts)
     .sort((a, b) => b[1] - a[1])
     .slice(0, 10)
+    .map(([artist]) => artist);
+
+  // ── 2b. Derive top disliked artists ───────────────────────────────────────
+  const dislikedArtistCounts = {};
+  for (const sd of songDislikes) {
+    if (sd.song?.artist) {
+      dislikedArtistCounts[sd.song.artist] = (dislikedArtistCounts[sd.song.artist] || 0) + 1;
+    }
+  }
+  const topDislikedArtists = Object.entries(dislikedArtistCounts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 8)
     .map(([artist]) => artist);
 
   // ── 3. Aggregate Last.fm tags from liked songs ─────────────────────────────
@@ -115,6 +133,27 @@ async function refreshTasteProfile(prisma, userId) {
     .slice(0, 15)
     .map(([tag, count]) => `${tag}(${count})`);
 
+  // ── 3b. Aggregate Last.fm tags from disliked songs ────────────────────────
+  const dislikedTagCounts = {};
+  for (const sd of songDislikes) {
+    for (const tag of (sd.song?.lastFmTags ?? [])) {
+      dislikedTagCounts[tag] = (dislikedTagCounts[tag] || 0) + 1;
+    }
+  }
+  const untaggedDislikes = songDislikes.filter(sd => !sd.song?.lastFmTags?.length).slice(0, 10);
+  await Promise.all(
+    untaggedDislikes.map(async sd => {
+      const tags = await getTrackTags(sd.song.title, sd.song.artist);
+      for (const tag of tags) {
+        dislikedTagCounts[tag] = (dislikedTagCounts[tag] || 0) + 1;
+      }
+    })
+  );
+  const topDislikedTags = Object.entries(dislikedTagCounts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 10)
+    .map(([tag]) => tag);
+
   // ── 4. User's own feedback tags ────────────────────────────────────────────
   const userFeedbackTags = feedbackTags
     .slice(0, 8)
@@ -133,6 +172,12 @@ ${topLastFmTags.length > 0 ? topLastFmTags.join(', ') : 'No data yet'}
 
 Tags this user assigns when they like a recommended song (tag(count)):
 ${userFeedbackTags.length > 0 ? userFeedbackTags.join(', ') : 'No data yet'}
+
+Artists this user has actively DISLIKED (never include these in the artists array):
+${topDislikedArtists.length > 0 ? topDislikedArtists.join(', ') : 'None'}
+
+Tags from songs this user has actively DISLIKED (avoid picking genres/moods that match these):
+${topDislikedTags.length > 0 ? topDislikedTags.join(', ') : 'None'}
 
 Valid genres (pick 1-4 that fit best): ${GENRE_OPTIONS.join(', ')}
 Valid moods (pick 1-4 that fit best): ${MOOD_OPTIONS.join(', ')}

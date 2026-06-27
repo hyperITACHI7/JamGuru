@@ -39,6 +39,7 @@ model User {
   groupsCreated           Group[]                @relation("GroupCreator")
   groupMemberships        GroupMember[]
   songLikes               SongLike[]
+  songDislikes            SongDislike[]
   playlists               Playlist[]
 
   @@map("users")
@@ -56,6 +57,7 @@ model Song {
 
   recommendations Recommendation[]
   songLikes       SongLike[]
+  songDislikes    SongDislike[]
   playlistSongs   PlaylistSong[]
 
   @@map("songs")
@@ -72,6 +74,19 @@ model SongLike {
 
   @@unique([userId, spotifyId])
   @@map("song_likes")
+}
+
+model SongDislike {
+  id         String   @id @default(uuid())
+  userId     String   @map("user_id")
+  spotifyId  String   @map("spotify_id")
+  dislikedAt DateTime @default(now()) @map("disliked_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  song Song @relation(fields: [spotifyId], references: [spotifyId], onDelete: Cascade)
+
+  @@unique([userId, spotifyId])
+  @@map("song_dislikes")
 }
 
 enum FriendshipStatus {
@@ -98,9 +113,11 @@ model Recommendation {
   senderId    String   @map("sender_id")
   recipientId String?  @map("recipient_id")
   groupId     String?  @map("group_id")
-  songId      String   @map("song_id")
-  context     String?
-  sentAt      DateTime @default(now()) @map("sent_at")
+  songId        String    @map("song_id")
+  context       String?
+  sentAt        DateTime  @default(now()) @map("sent_at")
+  dismissedAt   DateTime? @map("dismissed_at")
+  dismissedById String?   @map("dismissed_by_id")
 
   sender    User   @relation("RecSender",    fields: [senderId],    references: [id], onDelete: Cascade)
   recipient User?  @relation("RecRecipient", fields: [recipientId], references: [id], onDelete: SetNull)

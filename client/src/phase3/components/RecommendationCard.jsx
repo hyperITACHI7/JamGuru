@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import { Play, Pause, Heart, Music } from 'lucide-react'
+import { Play, Pause, Heart, Music, X, ThumbsDown } from 'lucide-react'
 import FeedbackTags from '../../phase4/components/FeedbackTags'
-import { likeRecommendation, unlikeRecommendation } from '../../phase4/api/likes'
+import { likeRecommendation, unlikeRecommendation, dismissRecommendation, dislikeRecommendation } from '../../phase4/api/likes'
 import { usePlayer } from '../../context/PlayerContext'
 
 function formatDate(iso) {
@@ -15,15 +15,32 @@ function formatDate(iso) {
 }
 
 export default function RecommendationCard({ rec: initialRec }) {
-  const [rec, setRec]           = useState(initialRec)
-  const [liking, setLiking]     = useState(false)
-  const [showTags, setShowTags] = useState(false)
+  const [rec, setRec]             = useState(initialRec)
+  const [liking, setLiking]       = useState(false)
+  const [dismissed, setDismissed] = useState(false)
+  const [showTags, setShowTags]   = useState(false)
   const player   = usePlayer()
   const isActive = player.isActive(rec.song)
   const playing  = isActive && player.playing
 
   function togglePreview() {
     player.toggle(rec.song)
+  }
+
+  async function handleDismiss() {
+    try {
+      await dismissRecommendation(rec.id)
+      setDismissed(true)
+      window.dispatchEvent(new CustomEvent('jam:like'))
+    } catch (_) {}
+  }
+
+  async function handleDislike() {
+    try {
+      await dislikeRecommendation(rec.id)
+      setDismissed(true)
+      window.dispatchEvent(new CustomEvent('jam:like'))
+    } catch (_) {}
   }
 
   async function toggleLike() {
@@ -43,6 +60,8 @@ export default function RecommendationCard({ rec: initialRec }) {
     } catch (_) {}
     setLiking(false)
   }
+
+  if (dismissed) return null
 
   return (
     <div className="bg-[#1a1a1a] rounded-2xl p-4 hover:bg-[#222] transition-colors">
@@ -106,6 +125,22 @@ export default function RecommendationCard({ rec: initialRec }) {
           {rec.likeCount > 0 && (
             <span className="text-[10px] text-[#B3B3B3] -mt-1">{rec.likeCount}</span>
           )}
+
+          <button
+            onClick={handleDislike}
+            title="Don't recommend things like this"
+            className="w-9 h-9 rounded-full flex items-center justify-center text-[#535353] hover:text-red-400 hover:bg-red-400/10 transition-colors"
+          >
+            <ThumbsDown size={15} />
+          </button>
+
+          <button
+            onClick={handleDismiss}
+            title="Not for me"
+            className="w-9 h-9 rounded-full flex items-center justify-center text-[#535353] hover:text-[#B3B3B3] hover:bg-[#282828] transition-colors"
+          >
+            <X size={15} />
+          </button>
         </div>
       </div>
 

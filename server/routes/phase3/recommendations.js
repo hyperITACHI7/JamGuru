@@ -75,7 +75,7 @@ router.post('/', auth, async (req, res) => {
 router.get('/inbox', auth, async (req, res) => {
   try {
     const recs = await prisma.recommendation.findMany({
-      where: { recipientId: req.userId },
+      where: { recipientId: req.userId, dismissedAt: null },
       include: {
         song: true,
         sender: { select: SAFE_USER },
@@ -120,6 +120,7 @@ router.get('/pending-count', auth, async (req, res) => {
     const count = await prisma.recommendation.count({
       where: {
         recipientId: req.userId,
+        dismissedAt: null,
         likes: { none: { likerId: req.userId } },
       },
     });
