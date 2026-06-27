@@ -286,9 +286,14 @@ router.post('/import-playlist', authMiddleware, async (req, res) => {
     const status = err.response?.status;
     const spotifyMsg = err.response?.data?.error?.message || err.response?.data?.error || err.message;
     console.error(`[import-playlist] Final error ${status}:`, spotifyMsg);
+    if (status === 403) {
+      return res.status(400).json({
+        error: 'This playlist is private. Either make it public in Spotify (three dots → Make public), or log out of JamGuru and log back in with Spotify to grant playlist access.',
+      });
+    }
     if (status === 404) {
       return res.status(400).json({
-        error: 'Playlist not found. Spotify blocks importing of algorithmic playlists (Discover Weekly, Daily Mix, Release Radar, etc.). Try a regular user-created playlist instead.',
+        error: 'Playlist not found. Spotify blocks importing of algorithmic playlists (Discover Weekly, Daily Mix, Release Radar). Try a regular user-created playlist.',
       });
     }
     res.status(502).json({ error: `Import failed (${status ?? 'network'}): ${spotifyMsg}` });
