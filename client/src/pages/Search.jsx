@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Search as SearchIcon, Play, Pause, Music, Share2 } from 'lucide-react'
+import { Search as SearchIcon, X, Play, Pause, Music, Share2 } from 'lucide-react'
 import TopBar from '../components/layout/TopBar'
 import { searchSongs } from '../api/songs'
 import SharePanel from '../phase5/components/SharePanel'
@@ -193,7 +193,7 @@ export default function Search() {
             />
             {query && (
               <button
-                onClick={() => { setQuery(''); setSelectedSong(null); inputRef.current?.focus() }}
+                onClick={() => { setQuery(''); inputRef.current?.focus() }}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-[#6a6a6a] hover:text-black transition-colors"
               >
                 <X size={16} />
