@@ -15,8 +15,8 @@ function formatDate(iso) {
 }
 
 export default function RecommendationCard({ rec: initialRec }) {
-  const [rec, setRec]         = useState(initialRec)
-  const [liking, setLiking]   = useState(false)
+  const [rec, setRec]           = useState(initialRec)
+  const [liking, setLiking]     = useState(false)
   const [reaction, setReaction] = useState(null) // null | 'dismiss' | 'dislike'
   const [showTags, setShowTags] = useState(false)
   const player   = usePlayer()
@@ -61,6 +61,8 @@ export default function RecommendationCard({ rec: initialRec }) {
     setLiking(false)
   }
 
+  const actionsLocked = showTags || reaction === 'dislike'
+
   return (
     <div className={`bg-[#1a1a1a] rounded-2xl p-4 hover:bg-[#222] transition-colors ${reaction === 'dislike' ? 'opacity-50' : ''}`}>
       <div className="flex gap-4">
@@ -90,8 +92,8 @@ export default function RecommendationCard({ rec: initialRec }) {
           )}
         </div>
 
-        {/* Actions — play and like side by side, compact */}
-        <div className="flex items-start gap-1.5 flex-shrink-0 pt-0.5">
+        {/* Actions — play on top, like below, vertically stacked */}
+        <div className="flex flex-col items-center gap-2 flex-shrink-0">
           <button
             onClick={togglePreview}
             disabled={!rec.song.previewUrl}
@@ -107,23 +109,20 @@ export default function RecommendationCard({ rec: initialRec }) {
             {playing ? <Pause size={15} fill="currentColor" /> : <Play size={15} fill="currentColor" />}
           </button>
 
-          <div className="flex flex-col items-center">
-            <button
-              onClick={toggleLike}
-              disabled={liking || reaction === 'dislike'}
-              title={rec.liked ? 'Unlike' : 'Like'}
-              className={`w-9 h-9 rounded-full flex items-center justify-center transition-colors ${
-                rec.liked
-                  ? 'text-[#1DB954] hover:text-red-400'
-                  : 'text-[#B3B3B3] hover:text-white'
-              } ${(liking || reaction === 'dislike') ? 'opacity-50 cursor-not-allowed' : ''}`}
-            >
-              <Heart size={16} fill={rec.liked ? 'currentColor' : 'none'} />
-            </button>
-            {rec.likeCount > 0 && (
-              <span className="text-[10px] text-[#B3B3B3] -mt-1">{rec.likeCount}</span>
-            )}
-          </div>
+          <button
+            onClick={toggleLike}
+            disabled={liking || reaction === 'dislike'}
+            title={rec.liked ? 'Unlike' : 'Like'}
+            className={`w-9 h-9 rounded-full flex items-center justify-center transition-colors ${
+              rec.liked ? 'text-[#1DB954] hover:text-red-400' : 'text-[#B3B3B3] hover:text-white'
+            } ${(liking || reaction === 'dislike') ? 'opacity-50 cursor-not-allowed' : ''}`}
+          >
+            <Heart size={16} fill={rec.liked ? 'currentColor' : 'none'} />
+          </button>
+
+          {rec.likeCount > 0 && (
+            <span className="text-[10px] text-[#B3B3B3] -mt-1">{rec.likeCount}</span>
+          )}
         </div>
       </div>
 
@@ -131,32 +130,42 @@ export default function RecommendationCard({ rec: initialRec }) {
         <FeedbackTags likeId={rec.likeId} />
       )}
 
-      {/* Bottom action row — dismiss/dislike or reacted label */}
-      <div className="mt-2.5 pt-2 border-t border-white/5">
-        {reaction ? (
-          <div className="flex items-center gap-1.5">
-            {reaction === 'dislike'
-              ? <><ThumbsDown size={10} className="text-[#535353]" /><span className="text-[10px] text-[#535353]">Not my vibe</span></>
-              : <span className="text-[10px] text-[#535353]">Not for me</span>
-            }
-          </div>
+      {/* Bottom row — Not for me (left) · Not my vibe (right) */}
+      <div className="mt-2.5 pt-2 border-t border-white/5 flex items-center justify-between">
+        {/* Left: Not for me */}
+        {reaction === 'dismiss' ? (
+          <span className="text-[10px] text-[#535353]">Not for me</span>
         ) : (
-          <div className="flex items-center gap-3">
-            <button
-              onClick={handleDislike}
-              className="flex items-center gap-1 text-[10px] text-[#535353] hover:text-red-400 transition-colors"
-            >
-              <ThumbsDown size={10} />
-              Not my vibe
-            </button>
-            <span className="text-[#333] text-[10px]">·</span>
-            <button
-              onClick={handleDismiss}
-              className="text-[10px] text-[#535353] hover:text-[#B3B3B3] transition-colors"
-            >
-              Not for me
-            </button>
-          </div>
+          <button
+            onClick={handleDismiss}
+            disabled={actionsLocked}
+            className={`text-[10px] transition-colors ${
+              actionsLocked
+                ? 'text-[#333] cursor-not-allowed'
+                : 'text-[#535353] hover:text-[#B3B3B3]'
+            }`}
+          >
+            Not for me
+          </button>
+        )}
+
+        {/* Right: Not my vibe */}
+        {reaction === 'dislike' ? (
+          <span className="flex items-center gap-1 text-[10px] text-[#535353]">
+            <ThumbsDown size={10} /> Not my vibe
+          </span>
+        ) : (
+          <button
+            onClick={handleDislike}
+            disabled={actionsLocked}
+            className={`flex items-center gap-1 text-[10px] transition-colors ${
+              actionsLocked
+                ? 'text-[#333] cursor-not-allowed'
+                : 'text-[#535353] hover:text-red-400'
+            }`}
+          >
+            <ThumbsDown size={10} /> Not my vibe
+          </button>
         )}
       </div>
     </div>

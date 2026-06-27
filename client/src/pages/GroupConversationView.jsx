@@ -20,7 +20,8 @@ function GroupMessage({ msg, onLikeToggle, onDislike }) {
   const playing  = active && player.playing
   const me       = JSON.parse(localStorage.getItem('user') || '{}')
   const isMe     = msg.sender?.id === me.id
-  const [disliked, setDisliked] = useState(false)
+  const [disliked, setDisliked]   = useState(false)
+  const [notForMe, setNotForMe]   = useState(false)
 
   async function handleDislike() {
     try {
@@ -71,36 +72,67 @@ function GroupMessage({ msg, onLikeToggle, onDislike }) {
           <p className="text-white/60 text-xs italic mt-2 leading-relaxed">"{msg.context}"</p>
         )}
 
-        {/* Like + dislike row */}
-        <div className="mt-2 flex items-center justify-between">
-          <span className="text-[#535353] text-[9px]">{formatTime(msg.sentAt)}</span>
-          <div className="flex items-center gap-2">
-            {!isMe && (
-              disliked ? (
+        {/* Timestamp */}
+        <p className="text-[#535353] text-[9px] mt-1.5 text-right">{formatTime(msg.sentAt)}</p>
+
+        {/* Like + dislike row — only for others' messages */}
+        {!isMe && (
+          <div className="mt-1.5 pt-1.5 border-t border-white/5 flex items-center justify-between">
+            {/* Left: Not for me (local only) */}
+            {notForMe ? (
+              <span className="text-[10px] text-[#535353]">Not for me</span>
+            ) : (
+              <button
+                onClick={() => setNotForMe(true)}
+                disabled={disliked}
+                className={`text-[10px] transition-colors ${
+                  disliked ? 'text-[#333] cursor-not-allowed' : 'text-[#535353] hover:text-[#B3B3B3]'
+                }`}
+              >
+                Not for me
+              </button>
+            )}
+
+            <div className="flex items-center gap-2">
+              {/* Right: thumbs down */}
+              {disliked ? (
                 <span className="flex items-center gap-1 text-[10px] text-[#535353]">
                   <ThumbsDown size={9} /> Not my vibe
                 </span>
               ) : (
                 <button
                   onClick={handleDislike}
-                  className="flex items-center gap-1 text-[10px] text-[#535353] hover:text-red-400 transition-colors"
+                  disabled={notForMe}
+                  className={`flex items-center gap-1 text-[10px] transition-colors ${
+                    notForMe ? 'text-[#333] cursor-not-allowed' : 'text-[#535353] hover:text-red-400'
+                  }`}
                 >
                   <ThumbsDown size={9} />
                 </button>
-              )
-            )}
-            <button
-              onClick={() => !disliked && onLikeToggle(msg)}
-              disabled={disliked}
-              className={`flex items-center gap-1 text-[10px] transition-colors ${
-                msg.liked ? 'text-purple-400' : 'text-[#B3B3B3] hover:text-white'
-              } ${disliked ? 'opacity-40 cursor-not-allowed' : ''}`}
-            >
-              <Heart size={10} fill={msg.liked ? 'currentColor' : 'none'} />
-              {msg.likeCount > 0 && <span>{msg.likeCount}</span>}
-            </button>
+              )}
+
+              {/* Like */}
+              <button
+                onClick={() => !disliked && onLikeToggle(msg)}
+                disabled={disliked}
+                className={`flex items-center gap-1 text-[10px] transition-colors ${
+                  msg.liked ? 'text-purple-400' : 'text-[#B3B3B3] hover:text-white'
+                } ${disliked ? 'opacity-40 cursor-not-allowed' : ''}`}
+              >
+                <Heart size={10} fill={msg.liked ? 'currentColor' : 'none'} />
+                {msg.likeCount > 0 && <span>{msg.likeCount}</span>}
+              </button>
+            </div>
           </div>
-        </div>
+        )}
+
+        {/* Like count row for own messages */}
+        {isMe && msg.likeCount > 0 && (
+          <div className="mt-1 flex items-center justify-end gap-1">
+            <Heart size={9} className="text-purple-400" fill="currentColor" />
+            <span className="text-[9px] text-purple-400">{msg.likeCount}</span>
+          </div>
+        )}
       </div>
     </div>
   )
