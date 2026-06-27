@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { NavLink } from 'react-router-dom'
-import { Home, Search, Library, Plus, ChevronLeft, Heart, Crown } from 'lucide-react'
+import { NavLink, useNavigate } from 'react-router-dom'
+import { Home, Search, Library, Plus, ChevronLeft, Heart, Crown, Music } from 'lucide-react'
 import api from '../../api/axios'
 
 function SpotifyCircle() {
@@ -13,6 +13,7 @@ function SpotifyCircle() {
 
 export default function Sidebar({ collapsed, setCollapsed }) {
   const [pendingCount, setPendingCount] = useState(0)
+  const navigate = useNavigate()
 
   useEffect(() => {
     api.get('/recommendations/pending-count')
@@ -116,7 +117,7 @@ export default function Sidebar({ collapsed, setCollapsed }) {
 
           {!collapsed && (
             <div className="flex items-center gap-1">
-              <button className="text-[#B3B3B3] hover:text-white hover:bg-[#1A1A1A] p-2 rounded-full transition-colors" title="Create playlist">
+              <button onClick={() => navigate('/import-playlist')} className="text-[#B3B3B3] hover:text-white hover:bg-[#1A1A1A] p-2 rounded-full transition-colors" title="Import Spotify playlist">
                 <Plus size={16} />
               </button>
               <button
@@ -160,6 +161,26 @@ export default function Sidebar({ collapsed, setCollapsed }) {
               <div className="overflow-hidden">
                 <p className="text-white text-sm font-medium truncate leading-tight">Liked Songs</p>
                 <p className="text-[#B3B3B3] text-xs mt-0.5">Playlist</p>
+              </div>
+            )}
+          </NavLink>
+
+          <NavLink
+            to="/import-playlist"
+            title={collapsed ? 'Import Spotify Playlist' : ''}
+            className={({ isActive }) =>
+              `flex items-center py-2 rounded-md transition-colors ${
+                isActive ? 'bg-[#282828]' : 'hover:bg-[#1A1A1A]'
+              } ${collapsed ? 'justify-center px-1' : 'gap-3 px-3'}`
+            }
+          >
+            <div className="w-10 h-10 flex-shrink-0 rounded bg-[#282828] flex items-center justify-center">
+              <Music size={14} className="text-[#B3B3B3]" />
+            </div>
+            {!collapsed && (
+              <div className="overflow-hidden">
+                <p className="text-white text-sm font-medium truncate leading-tight">Import from Spotify</p>
+                <p className="text-[#B3B3B3] text-xs mt-0.5">Paste a playlist link</p>
               </div>
             )}
           </NavLink>
