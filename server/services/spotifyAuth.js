@@ -155,6 +155,7 @@ async function getPlaylistTracks(playlistId, accessToken) {
   });
 
   const data = playlistRes.data;
+  console.log('[getPlaylistTracks] response top-level keys:', Object.keys(data));
   console.log('[getPlaylistTracks] tracks keys:', Object.keys(data.tracks || {}));
   console.log('[getPlaylistTracks] tracks.total:', data.tracks?.total, 'items:', data.tracks?.items?.length);
   const meta = {
