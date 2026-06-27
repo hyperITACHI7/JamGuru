@@ -2,7 +2,11 @@ import { useState, useEffect, useRef } from 'react'
 import { ArrowLeft, Play, Pause, Heart, Music, MessageCircle, Sparkles, Send, X, ChevronRight, ThumbsDown } from 'lucide-react'
 import FriendProfileSheet from '../components/FriendProfileSheet'
 import { getConversation, sendRecommendation } from '../phase3/api/recommendations'
-import { likeRecommendation, unlikeRecommendation, dismissRecommendation, dislikeRecommendation } from '../phase4/api/likes'
+import {
+  likeRecommendation, unlikeRecommendation,
+  dismissRecommendation, undismissRecommendation,
+  dislikeRecommendation, undislikeRecommendation,
+} from '../phase4/api/likes'
 import FeedbackTags from '../phase4/components/FeedbackTags'
 import { usePlayer } from '../context/PlayerContext'
 import { getAiSuggestion } from '../phase7/api/ai'
@@ -23,18 +27,33 @@ function Bubble({ msg, onLike, justLiked }) {
   const isSent  = msg.direction === 'sent'
   const [reaction, setReaction] = useState(msg.dismissed ? 'dismiss' : null)
 
+  const tagPickerOpen = justLiked && !!msg.likeId
+  const dismissActive = reaction === 'dismiss'
+  const dislikeActive = reaction === 'dislike'
+  const anyReaction   = dismissActive || dislikeActive
+
   async function handleDismiss() {
     try {
-      await dismissRecommendation(msg.id)
-      setReaction('dismiss')
+      if (dismissActive) {
+        await undismissRecommendation(msg.id)
+        setReaction(null)
+      } else {
+        await dismissRecommendation(msg.id)
+        setReaction('dismiss')
+      }
       window.dispatchEvent(new CustomEvent('jam:like'))
     } catch (_) {}
   }
 
   async function handleDislike() {
     try {
-      await dislikeRecommendation(msg.id)
-      setReaction('dislike')
+      if (dislikeActive) {
+        await undislikeRecommendation(msg.id)
+        setReaction(null)
+      } else {
+        await dislikeRecommendation(msg.id)
+        setReaction('dislike')
+      }
       window.dispatchEvent(new CustomEvent('jam:like'))
     } catch (_) {}
   }
@@ -43,9 +62,9 @@ function Bubble({ msg, onLike, justLiked }) {
     <div className={`flex ${isSent ? 'justify-end' : 'justify-start'} mb-4 px-4`}>
       <div className={`max-w-[72%] rounded-2xl p-3 ${
         isSent ? 'bg-[#1DB954]/15 rounded-tr-sm' : 'bg-[#282828] rounded-tl-sm'
-      } ${reaction === 'dislike' ? 'opacity-60' : ''}`}>
+      } ${dislikeActive ? 'opacity-60' : ''}`}>
 
-        {/* Song row */}
+        {/* Song row — art + info + right column (play / like) */}
         <div className="flex items-center gap-2.5">
           <div className="w-11 h-11 flex-shrink-0 rounded-lg overflow-hidden bg-[#3e3e3e]">
             {msg.song.albumArtUrl
@@ -57,18 +76,46 @@ function Bubble({ msg, onLike, justLiked }) {
             <p className="text-white text-xs font-semibold truncate leading-tight">{msg.song.title}</p>
             <p className="text-[#B3B3B3] text-[10px] truncate mt-0.5">{msg.song.artist}</p>
           </div>
-          {msg.song.previewUrl && (
-            <button
-              onClick={() => player.toggle(msg.song)}
-              className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 transition-colors ${
-                playing ? 'bg-[#1DB954] text-black' : 'bg-[#3e3e3e] text-white hover:bg-[#535353]'
-              }`}
-            >
-              {playing
-                ? <Pause size={10} fill="currentColor" />
-                : <Play  size={10} fill="currentColor" />
-              }
-            </button>
+
+          {/* Right column: play on top, like below (received only) */}
+          {!isSent ? (
+            <div className="flex flex-col items-center gap-1.5 flex-shrink-0">
+              {msg.song.previewUrl && (
+                <button
+                  onClick={() => player.toggle(msg.song)}
+                  className={`w-7 h-7 rounded-full flex items-center justify-center transition-colors ${
+                    playing ? 'bg-[#1DB954] text-black' : 'bg-[#3e3e3e] text-white hover:bg-[#535353]'
+                  }`}
+                >
+                  {playing ? <Pause size={10} fill="currentColor" /> : <Play size={10} fill="currentColor" />}
+                </button>
+              )}
+              <button
+                onClick={() => onLike(msg)}
+                disabled={anyReaction}
+                className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${
+                  msg.liked
+                    ? 'text-[#1DB954] hover:text-red-400'
+                    : anyReaction
+                      ? 'text-[#333] cursor-not-allowed'
+                      : 'text-[#B3B3B3] hover:text-white'
+                }`}
+              >
+                <Heart size={14} fill={msg.liked ? 'currentColor' : 'none'} />
+              </button>
+            </div>
+          ) : (
+            /* Sent — play button only on right */
+            msg.song.previewUrl && (
+              <button
+                onClick={() => player.toggle(msg.song)}
+                className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 transition-colors ${
+                  playing ? 'bg-[#1DB954] text-black' : 'bg-[#3e3e3e] text-white hover:bg-[#535353]'
+                }`}
+              >
+                {playing ? <Pause size={10} fill="currentColor" /> : <Play size={10} fill="currentColor" />}
+              </button>
+            )
           )}
         </div>
 
@@ -77,11 +124,11 @@ function Bubble({ msg, onLike, justLiked }) {
           <p className="text-white/60 text-xs italic mt-2 leading-relaxed">"{msg.context}"</p>
         )}
 
-        {/* SENT rec: show recipient's reaction — liked, not for me, or pending */}
+        {/* SENT — show recipient reaction */}
         {isSent && (
           <div className="mt-2 flex items-center gap-2 flex-wrap">
             <span className={`flex items-center gap-1 text-[10px] font-medium ${
-              msg.liked ? 'text-[#1DB954]' : msg.dismissed ? 'text-[#535353]' : 'text-[#535353]'
+              msg.liked ? 'text-[#1DB954]' : 'text-[#535353]'
             }`}>
               {msg.liked
                 ? <><Heart size={9} fill="currentColor" /> Loved it</>
@@ -98,12 +145,12 @@ function Bubble({ msg, onLike, justLiked }) {
           </div>
         )}
 
-        {/* RECEIVED rec: like + dismiss/dislike actions */}
+        {/* RECEIVED — tag picker + bottom reaction row */}
         {!isSent && (
-          <div className="mt-2">
+          <>
             {/* Previously saved tags */}
             {msg.liked && !justLiked && msg.tags.length > 0 && (
-              <div className="flex flex-wrap gap-1 mb-1.5">
+              <div className="flex flex-wrap gap-1 mt-2 mb-1">
                 {msg.tags.map(tag => (
                   <span key={tag} className="text-[9px] bg-white/10 text-white/70 px-1.5 py-0.5 rounded-full font-semibold">
                     {tag}
@@ -111,50 +158,39 @@ function Bubble({ msg, onLike, justLiked }) {
                 ))}
               </div>
             )}
-            {/* Tag picker — shown right after liking */}
-            {justLiked && msg.likeId && (
-              <FeedbackTags likeId={msg.likeId} />
-            )}
+            {tagPickerOpen && <FeedbackTags likeId={msg.likeId} />}
 
-            {reaction ? (
-              <p className="flex items-center gap-1 text-[10px] text-[#535353]">
-                {reaction === 'dislike'
-                  ? <><ThumbsDown size={9} /> Not my vibe</>
-                  : 'Not for me'
-                }
-              </p>
-            ) : (
-              <div className="flex items-center gap-3 flex-wrap">
-                <button
-                  onClick={() => onLike(msg)}
-                  className={`flex items-center gap-1 text-[10px] transition-colors ${
-                    msg.liked ? 'text-[#1DB954]' : 'text-[#B3B3B3] hover:text-white'
-                  }`}
-                >
-                  <Heart size={10} fill={msg.liked ? 'currentColor' : 'none'} />
-                  {msg.liked ? 'Liked' : 'Like this rec'}
-                </button>
-                {!msg.liked && (
-                  <>
-                    <span className="text-[#333] text-[9px]">·</span>
-                    <button
-                      onClick={handleDislike}
-                      className="flex items-center gap-1 text-[10px] text-[#535353] hover:text-red-400 transition-colors"
-                    >
-                      <ThumbsDown size={9} /> Not my vibe
-                    </button>
-                    <span className="text-[#333] text-[9px]">·</span>
-                    <button
-                      onClick={handleDismiss}
-                      className="text-[10px] text-[#535353] hover:text-[#B3B3B3] transition-colors"
-                    >
-                      Not for me
-                    </button>
-                  </>
-                )}
-              </div>
-            )}
-          </div>
+            {/* Bottom row — Not for me (left) · Not my vibe (right) */}
+            <div className="mt-2 pt-1.5 border-t border-white/5 flex items-center justify-between">
+              <button
+                onClick={handleDismiss}
+                disabled={msg.liked || dislikeActive || tagPickerOpen}
+                className={`text-[10px] font-medium transition-colors ${
+                  dismissActive
+                    ? 'text-white'
+                    : msg.liked || dislikeActive || tagPickerOpen
+                      ? 'text-[#333] cursor-not-allowed'
+                      : 'text-[#535353] hover:text-[#B3B3B3]'
+                }`}
+              >
+                Not for me
+              </button>
+              <button
+                onClick={handleDislike}
+                disabled={msg.liked || dismissActive || tagPickerOpen}
+                className={`flex items-center gap-1 text-[10px] font-medium transition-colors ${
+                  dislikeActive
+                    ? 'text-red-400'
+                    : msg.liked || dismissActive || tagPickerOpen
+                      ? 'text-[#333] cursor-not-allowed'
+                      : 'text-[#535353] hover:text-red-400'
+                }`}
+              >
+                <ThumbsDown size={9} fill={dislikeActive ? 'currentColor' : 'none'} />
+                Not my vibe
+              </button>
+            </div>
+          </>
         )}
 
         <p className="text-[#535353] text-[9px] mt-1.5 text-right">{formatTime(msg.sentAt)}</p>
@@ -169,11 +205,10 @@ export default function ConversationView({ friend, onBack }) {
   const [liking, setLiking]             = useState(null)
   const [justLikedIds, setJustLikedIds] = useState(new Set())
 
-  // AI suggest compose state
-  const [suggesting, setSuggesting]     = useState(false)
-  const [suggested, setSuggested]       = useState(null)  // { song, aiQuery }
-  const [suggestNote, setSuggestNote]   = useState('')
-  const [sending, setSending]           = useState(false)
+  const [suggesting, setSuggesting]   = useState(false)
+  const [suggested, setSuggested]     = useState(null)
+  const [suggestNote, setSuggestNote] = useState('')
+  const [sending, setSending]         = useState(false)
   const [suggestError, setSuggestError] = useState('')
 
   const bottomRef = useRef(null)
@@ -308,7 +343,7 @@ export default function ConversationView({ friend, onBack }) {
         )}
       </div>
 
-      {/* AI suggest compose bar — pinned to bottom */}
+      {/* AI suggest compose bar */}
       <div className="flex-shrink-0 border-t border-white/5 bg-[#181818] px-4 py-3">
         {suggested ? (
           <div className="space-y-2">
