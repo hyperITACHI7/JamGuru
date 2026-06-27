@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
-import { ArrowLeft, Play, Pause, Heart, Music, Users, ChevronRight } from 'lucide-react'
+import { ArrowLeft, Play, Pause, Heart, Music, Users, ChevronRight, ThumbsDown } from 'lucide-react'
 import { getGroupFeed, likeGroupRec, unlikeGroupRec } from '../phase5/api/groups'
+import { dislikeSong } from '../phase4/api/likes'
 import { usePlayer } from '../context/PlayerContext'
 import GroupMembersSheet from '../components/GroupMembersSheet'
 
@@ -13,12 +14,20 @@ function formatTime(iso) {
   return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
 }
 
-function GroupMessage({ msg, groupId, onLikeToggle }) {
-  const player  = usePlayer()
-  const active  = player.isActive(msg.song)
-  const playing = active && player.playing
-  const me      = JSON.parse(localStorage.getItem('user') || '{}')
-  const isMe    = msg.sender?.id === me.id
+function GroupMessage({ msg, onLikeToggle, onDislike }) {
+  const player   = usePlayer()
+  const active   = player.isActive(msg.song)
+  const playing  = active && player.playing
+  const me       = JSON.parse(localStorage.getItem('user') || '{}')
+  const isMe     = msg.sender?.id === me.id
+  const [disliked, setDisliked] = useState(false)
+
+  async function handleDislike() {
+    try {
+      await onDislike(msg.song.spotifyId)
+      setDisliked(true)
+    } catch (_) {}
+  }
 
   return (
     <div className={`flex ${isMe ? 'justify-end' : 'justify-start'} mb-4 px-4`}>
@@ -29,7 +38,7 @@ function GroupMessage({ msg, groupId, onLikeToggle }) {
       )}
       <div className={`max-w-[68%] rounded-2xl p-3 ${
         isMe ? 'bg-purple-600/20 rounded-tr-sm' : 'bg-[#282828] rounded-tl-sm'
-      }`}>
+      } ${disliked ? 'opacity-60' : ''}`}>
         {!isMe && (
           <p className="text-purple-400 text-[10px] font-bold mb-1.5">{msg.sender?.displayName}</p>
         )}
@@ -62,18 +71,35 @@ function GroupMessage({ msg, groupId, onLikeToggle }) {
           <p className="text-white/60 text-xs italic mt-2 leading-relaxed">"{msg.context}"</p>
         )}
 
-        {/* Like row */}
+        {/* Like + dislike row */}
         <div className="mt-2 flex items-center justify-between">
           <span className="text-[#535353] text-[9px]">{formatTime(msg.sentAt)}</span>
-          <button
-            onClick={() => onLikeToggle(msg)}
-            className={`flex items-center gap-1 text-[10px] transition-colors ${
-              msg.liked ? 'text-purple-400' : 'text-[#B3B3B3] hover:text-white'
-            }`}
-          >
-            <Heart size={10} fill={msg.liked ? 'currentColor' : 'none'} />
-            {msg.likeCount > 0 && <span>{msg.likeCount}</span>}
-          </button>
+          <div className="flex items-center gap-2">
+            {!isMe && (
+              disliked ? (
+                <span className="flex items-center gap-1 text-[10px] text-[#535353]">
+                  <ThumbsDown size={9} /> Not my vibe
+                </span>
+              ) : (
+                <button
+                  onClick={handleDislike}
+                  className="flex items-center gap-1 text-[10px] text-[#535353] hover:text-red-400 transition-colors"
+                >
+                  <ThumbsDown size={9} />
+                </button>
+              )
+            )}
+            <button
+              onClick={() => !disliked && onLikeToggle(msg)}
+              disabled={disliked}
+              className={`flex items-center gap-1 text-[10px] transition-colors ${
+                msg.liked ? 'text-purple-400' : 'text-[#B3B3B3] hover:text-white'
+              } ${disliked ? 'opacity-40 cursor-not-allowed' : ''}`}
+            >
+              <Heart size={10} fill={msg.liked ? 'currentColor' : 'none'} />
+              {msg.likeCount > 0 && <span>{msg.likeCount}</span>}
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -116,6 +142,10 @@ export default function GroupConversationView({ group, onBack }) {
       }
     } catch (_) {}
     setLiking(null)
+  }
+
+  async function handleDislike(spotifyId) {
+    await dislikeSong(spotifyId)
   }
 
   return (
@@ -167,8 +197,8 @@ export default function GroupConversationView({ group, onBack }) {
               <GroupMessage
                 key={msg.id}
                 msg={msg}
-                groupId={group.id}
                 onLikeToggle={handleLikeToggle}
+                onDislike={handleDislike}
               />
             ))}
             <div ref={bottomRef} />

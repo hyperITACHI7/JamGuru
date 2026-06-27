@@ -141,6 +141,25 @@ router.delete('/songs/:id/like', auth, async (req, res) => {
   }
 });
 
+// POST /api/songs/:id/dislike — song-level dislike (for group chats and general use)
+router.post('/songs/:id/dislike', auth, async (req, res) => {
+  try {
+    const song = await prisma.song.findUnique({ where: { spotifyId: req.params.id } });
+    if (!song) return res.status(404).json({ error: 'Song not cached — search for it first' });
+
+    await prisma.songDislike.upsert({
+      where: { userId_spotifyId: { userId: req.userId, spotifyId: req.params.id } },
+      create: { userId: req.userId, spotifyId: req.params.id },
+      update: {},
+    });
+    refreshTasteProfile(prisma, req.userId).catch(() => {});
+    res.json({ disliked: true });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // POST /api/recommendations/:id/dismiss — remove from inbox without algorithmic penalty
 router.post('/recommendations/:id/dismiss', auth, async (req, res) => {
   try {

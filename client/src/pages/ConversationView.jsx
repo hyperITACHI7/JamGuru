@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
-import { ArrowLeft, Play, Pause, Heart, Music, MessageCircle, Sparkles, Send, X, ChevronRight } from 'lucide-react'
+import { ArrowLeft, Play, Pause, Heart, Music, MessageCircle, Sparkles, Send, X, ChevronRight, ThumbsDown } from 'lucide-react'
 import FriendProfileSheet from '../components/FriendProfileSheet'
 import { getConversation, sendRecommendation } from '../phase3/api/recommendations'
-import { likeRecommendation, unlikeRecommendation } from '../phase4/api/likes'
+import { likeRecommendation, unlikeRecommendation, dismissRecommendation, dislikeRecommendation } from '../phase4/api/likes'
 import FeedbackTags from '../phase4/components/FeedbackTags'
 import { usePlayer } from '../context/PlayerContext'
 import { getAiSuggestion } from '../phase7/api/ai'
@@ -21,12 +21,29 @@ function Bubble({ msg, onLike, justLiked }) {
   const active  = player.isActive(msg.song)
   const playing = active && player.playing
   const isSent  = msg.direction === 'sent'
+  const [reaction, setReaction] = useState(msg.dismissed ? 'dismiss' : null)
+
+  async function handleDismiss() {
+    try {
+      await dismissRecommendation(msg.id)
+      setReaction('dismiss')
+      window.dispatchEvent(new CustomEvent('jam:like'))
+    } catch (_) {}
+  }
+
+  async function handleDislike() {
+    try {
+      await dislikeRecommendation(msg.id)
+      setReaction('dislike')
+      window.dispatchEvent(new CustomEvent('jam:like'))
+    } catch (_) {}
+  }
 
   return (
     <div className={`flex ${isSent ? 'justify-end' : 'justify-start'} mb-4 px-4`}>
       <div className={`max-w-[72%] rounded-2xl p-3 ${
         isSent ? 'bg-[#1DB954]/15 rounded-tr-sm' : 'bg-[#282828] rounded-tl-sm'
-      }`}>
+      } ${reaction ? 'opacity-60' : ''}`}>
 
         {/* Song row */}
         <div className="flex items-center gap-2.5">
@@ -60,14 +77,18 @@ function Bubble({ msg, onLike, justLiked }) {
           <p className="text-white/60 text-xs italic mt-2 leading-relaxed">"{msg.context}"</p>
         )}
 
-        {/* SENT rec: show if the friend liked it + their tags (the feedback loop) */}
+        {/* SENT rec: show recipient's reaction — liked, not for me, or pending */}
         {isSent && (
           <div className="mt-2 flex items-center gap-2 flex-wrap">
             <span className={`flex items-center gap-1 text-[10px] font-medium ${
-              msg.liked ? 'text-[#1DB954]' : 'text-[#535353]'
+              msg.liked ? 'text-[#1DB954]' : msg.dismissed ? 'text-[#535353]' : 'text-[#535353]'
             }`}>
-              <Heart size={9} fill={msg.liked ? 'currentColor' : 'none'} />
-              {msg.liked ? 'Loved it' : 'Not liked yet'}
+              {msg.liked
+                ? <><Heart size={9} fill="currentColor" /> Loved it</>
+                : msg.dismissed
+                  ? <><ThumbsDown size={9} /> Not for me</>
+                  : <><Heart size={9} fill="none" /> Not liked yet</>
+              }
             </span>
             {msg.tags.map(tag => (
               <span key={tag} className="text-[9px] bg-[#1DB954]/20 text-[#1DB954] px-1.5 py-0.5 rounded-full font-semibold">
@@ -77,7 +98,7 @@ function Bubble({ msg, onLike, justLiked }) {
           </div>
         )}
 
-        {/* RECEIVED rec: like button + tag picker if newly liked, or existing tags */}
+        {/* RECEIVED rec: like + dismiss/dislike actions */}
         {!isSent && (
           <div className="mt-2">
             {/* Previously saved tags */}
@@ -94,15 +115,45 @@ function Bubble({ msg, onLike, justLiked }) {
             {justLiked && msg.likeId && (
               <FeedbackTags likeId={msg.likeId} />
             )}
-            <button
-              onClick={() => onLike(msg)}
-              className={`flex items-center gap-1 text-[10px] transition-colors ${
-                msg.liked ? 'text-[#1DB954]' : 'text-[#B3B3B3] hover:text-white'
-              }`}
-            >
-              <Heart size={10} fill={msg.liked ? 'currentColor' : 'none'} />
-              {msg.liked ? 'Liked' : 'Like this rec'}
-            </button>
+
+            {reaction ? (
+              <p className="flex items-center gap-1 text-[10px] text-[#535353]">
+                {reaction === 'dislike'
+                  ? <><ThumbsDown size={9} /> Not my vibe</>
+                  : 'Not for me'
+                }
+              </p>
+            ) : (
+              <div className="flex items-center gap-3 flex-wrap">
+                <button
+                  onClick={() => onLike(msg)}
+                  className={`flex items-center gap-1 text-[10px] transition-colors ${
+                    msg.liked ? 'text-[#1DB954]' : 'text-[#B3B3B3] hover:text-white'
+                  }`}
+                >
+                  <Heart size={10} fill={msg.liked ? 'currentColor' : 'none'} />
+                  {msg.liked ? 'Liked' : 'Like this rec'}
+                </button>
+                {!msg.liked && (
+                  <>
+                    <span className="text-[#333] text-[9px]">·</span>
+                    <button
+                      onClick={handleDislike}
+                      className="flex items-center gap-1 text-[10px] text-[#535353] hover:text-red-400 transition-colors"
+                    >
+                      <ThumbsDown size={9} /> Not my vibe
+                    </button>
+                    <span className="text-[#333] text-[9px]">·</span>
+                    <button
+                      onClick={handleDismiss}
+                      className="text-[10px] text-[#535353] hover:text-[#B3B3B3] transition-colors"
+                    >
+                      Not for me
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
           </div>
         )}
 

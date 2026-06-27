@@ -169,6 +169,7 @@ router.get('/conversation/:friendId', auth, async (req, res) => {
         liked:     r.likes.length > 0,
         likeId:    r.likes[0]?.id ?? null,
         tags:      r.likes[0]?.feedbacks?.map(f => f.tag) ?? [],
+        dismissed: !!r.dismissedAt,
       }));
 
     const messages = [

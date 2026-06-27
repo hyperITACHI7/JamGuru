@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Play, Pause, Heart, Music, X, ThumbsDown } from 'lucide-react'
+import { Play, Pause, Heart, Music, ThumbsDown } from 'lucide-react'
 import FeedbackTags from '../../phase4/components/FeedbackTags'
 import { likeRecommendation, unlikeRecommendation, dismissRecommendation, dislikeRecommendation } from '../../phase4/api/likes'
 import { usePlayer } from '../../context/PlayerContext'
@@ -15,10 +15,10 @@ function formatDate(iso) {
 }
 
 export default function RecommendationCard({ rec: initialRec }) {
-  const [rec, setRec]             = useState(initialRec)
-  const [liking, setLiking]       = useState(false)
-  const [dismissed, setDismissed] = useState(false)
-  const [showTags, setShowTags]   = useState(false)
+  const [rec, setRec]         = useState(initialRec)
+  const [liking, setLiking]   = useState(false)
+  const [reaction, setReaction] = useState(null) // null | 'dismiss' | 'dislike'
+  const [showTags, setShowTags] = useState(false)
   const player   = usePlayer()
   const isActive = player.isActive(rec.song)
   const playing  = isActive && player.playing
@@ -30,7 +30,7 @@ export default function RecommendationCard({ rec: initialRec }) {
   async function handleDismiss() {
     try {
       await dismissRecommendation(rec.id)
-      setDismissed(true)
+      setReaction('dismiss')
       window.dispatchEvent(new CustomEvent('jam:like'))
     } catch (_) {}
   }
@@ -38,7 +38,7 @@ export default function RecommendationCard({ rec: initialRec }) {
   async function handleDislike() {
     try {
       await dislikeRecommendation(rec.id)
-      setDismissed(true)
+      setReaction('dislike')
       window.dispatchEvent(new CustomEvent('jam:like'))
     } catch (_) {}
   }
@@ -61,10 +61,8 @@ export default function RecommendationCard({ rec: initialRec }) {
     setLiking(false)
   }
 
-  if (dismissed) return null
-
   return (
-    <div className="bg-[#1a1a1a] rounded-2xl p-4 hover:bg-[#222] transition-colors">
+    <div className={`bg-[#1a1a1a] rounded-2xl p-4 hover:bg-[#222] transition-colors ${reaction ? 'opacity-50' : ''}`}>
       <div className="flex gap-4">
         {/* Album art */}
         <div className="w-16 h-16 flex-shrink-0 rounded-xl overflow-hidden bg-[#282828] shadow-md">
@@ -92,8 +90,8 @@ export default function RecommendationCard({ rec: initialRec }) {
           )}
         </div>
 
-        {/* Actions */}
-        <div className="flex flex-col items-center gap-2 flex-shrink-0">
+        {/* Actions — play and like side by side, compact */}
+        <div className="flex items-start gap-1.5 flex-shrink-0 pt-0.5">
           <button
             onClick={togglePreview}
             disabled={!rec.song.previewUrl}
@@ -109,44 +107,58 @@ export default function RecommendationCard({ rec: initialRec }) {
             {playing ? <Pause size={15} fill="currentColor" /> : <Play size={15} fill="currentColor" />}
           </button>
 
-          <button
-            onClick={toggleLike}
-            disabled={liking}
-            title={rec.liked ? 'Unlike' : 'Like'}
-            className={`w-9 h-9 rounded-full flex items-center justify-center transition-colors ${
-              rec.liked
-                ? 'text-[#1DB954] hover:text-red-400'
-                : 'text-[#B3B3B3] hover:text-white'
-            } ${liking ? 'opacity-50 cursor-not-allowed' : ''}`}
-          >
-            <Heart size={16} fill={rec.liked ? 'currentColor' : 'none'} />
-          </button>
-
-          {rec.likeCount > 0 && (
-            <span className="text-[10px] text-[#B3B3B3] -mt-1">{rec.likeCount}</span>
-          )}
-
-          <button
-            onClick={handleDislike}
-            title="Don't recommend things like this"
-            className="w-9 h-9 rounded-full flex items-center justify-center text-[#535353] hover:text-red-400 hover:bg-red-400/10 transition-colors"
-          >
-            <ThumbsDown size={15} />
-          </button>
-
-          <button
-            onClick={handleDismiss}
-            title="Not for me"
-            className="w-9 h-9 rounded-full flex items-center justify-center text-[#535353] hover:text-[#B3B3B3] hover:bg-[#282828] transition-colors"
-          >
-            <X size={15} />
-          </button>
+          <div className="flex flex-col items-center">
+            <button
+              onClick={toggleLike}
+              disabled={liking || !!reaction}
+              title={rec.liked ? 'Unlike' : 'Like'}
+              className={`w-9 h-9 rounded-full flex items-center justify-center transition-colors ${
+                rec.liked
+                  ? 'text-[#1DB954] hover:text-red-400'
+                  : 'text-[#B3B3B3] hover:text-white'
+              } ${(liking || reaction) ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
+              <Heart size={16} fill={rec.liked ? 'currentColor' : 'none'} />
+            </button>
+            {rec.likeCount > 0 && (
+              <span className="text-[10px] text-[#B3B3B3] -mt-1">{rec.likeCount}</span>
+            )}
+          </div>
         </div>
       </div>
 
       {showTags && rec.likeId && (
         <FeedbackTags likeId={rec.likeId} />
       )}
+
+      {/* Bottom action row — dismiss/dislike or reacted label */}
+      <div className="mt-2.5 pt-2 border-t border-white/5">
+        {reaction ? (
+          <div className="flex items-center gap-1.5">
+            {reaction === 'dislike'
+              ? <><ThumbsDown size={10} className="text-[#535353]" /><span className="text-[10px] text-[#535353]">Not my vibe</span></>
+              : <span className="text-[10px] text-[#535353]">Not for me</span>
+            }
+          </div>
+        ) : (
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleDislike}
+              className="flex items-center gap-1 text-[10px] text-[#535353] hover:text-red-400 transition-colors"
+            >
+              <ThumbsDown size={10} />
+              Not my vibe
+            </button>
+            <span className="text-[#333] text-[10px]">·</span>
+            <button
+              onClick={handleDismiss}
+              className="text-[10px] text-[#535353] hover:text-[#B3B3B3] transition-colors"
+            >
+              Not for me
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
