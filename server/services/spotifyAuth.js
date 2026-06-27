@@ -12,6 +12,8 @@ const SCOPES = [
   'user-read-private',
   'user-read-email',
   'user-library-read',
+  'playlist-read-private',
+  'playlist-read-collaborative',
 ].join(' ');
 
 function getAuthUrl(state) {
