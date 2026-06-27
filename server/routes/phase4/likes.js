@@ -24,6 +24,13 @@ router.post('/recommendations/:id/like', auth, async (req, res) => {
       throw e;
     }
 
+    // Also save the song to the user's Liked Songs playlist
+    await prisma.songLike.upsert({
+      where: { userId_spotifyId: { userId: req.userId, spotifyId: rec.songId } },
+      create: { userId: req.userId, spotifyId: rec.songId },
+      update: {},
+    });
+
     await recomputeScores(prisma, { recommendationId: req.params.id, likerId: req.userId });
 
     const likeCount = await prisma.like.count({ where: { recommendationId: req.params.id } });
