@@ -39,6 +39,7 @@ model User {
   groupsCreated           Group[]                @relation("GroupCreator")
   groupMemberships        GroupMember[]
   songLikes               SongLike[]
+  playlists               Playlist[]
 
   @@map("users")
 }
@@ -55,6 +56,7 @@ model Song {
 
   recommendations Recommendation[]
   songLikes       SongLike[]
+  playlistSongs   PlaylistSong[]
 
   @@map("songs")
 }
@@ -199,6 +201,33 @@ model GroupMember {
 
   @@id([groupId, userId])
   @@map("group_members")
+}
+
+model Playlist {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  name        String
+  description String?
+  coverUrl    String?  @map("cover_url")
+  sourceUrl   String?  @map("source_url")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  user  User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  songs PlaylistSong[]
+
+  @@map("playlists")
+}
+
+model PlaylistSong {
+  playlistId String @map("playlist_id")
+  spotifyId  String @map("spotify_id")
+  position   Int    @default(0)
+
+  playlist Playlist @relation(fields: [playlistId], references: [id], onDelete: Cascade)
+  song     Song     @relation(fields: [spotifyId], references: [spotifyId], onDelete: Cascade)
+
+  @@id([playlistId, spotifyId])
+  @@map("playlist_songs")
 }
 
 model GroupScore {

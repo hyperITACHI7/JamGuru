@@ -15,6 +15,7 @@ const p5GroupRoutes   = require('./routes/phase5/groups');
 const p6ResetRoutes   = require('./routes/phase6/reset');
 const p7AiRoutes      = require('./routes/phase7/ai');
 const tasteRoutes     = require('./routes/tasteProfile');
+const playlistRoutes  = require('./routes/playlists');
 const { scheduleMonthlyReset } = require('./jobs/monthlyReset');
 
 const app = express();
@@ -39,7 +40,8 @@ app.use('/api',                 p4JamGuruRoutes); // /api/jamguru/*, /api/trust-
 app.use('/api/groups',          p5GroupRoutes);   // /api/groups/*
 app.use('/api/phase6',          p6ResetRoutes);   // /api/phase6/reset
 app.use('/api',                 p7AiRoutes);      // /api/ai/context/:id, /api/ai/suggest/:id
-app.use('/api/profile/taste',   tasteRoutes);     // /api/profile/taste GET/PATCH/POST/refresh
+app.use('/api/profile/taste',   tasteRoutes);
+app.use('/api/playlists',       playlistRoutes);     // /api/profile/taste GET/PATCH/POST/refresh
 
 app.get('/api/health', (_req, res) => res.json({ status: 'ok' }));
 

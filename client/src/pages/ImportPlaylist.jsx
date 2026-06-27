@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Music, Check, Loader } from 'lucide-react'
 import TopBar from '../components/layout/TopBar'
 import api from '../api/axios'
@@ -8,6 +9,7 @@ export default function ImportPlaylist() {
   const [status, setStatus] = useState('idle')
   const [result, setResult] = useState(null)
   const [err, setErr]       = useState('')
+  const navigate = useNavigate()
 
   async function handleImport() {
     const trimmed = url.trim()
@@ -18,6 +20,10 @@ export default function ImportPlaylist() {
       const { data } = await api.post('/auth/spotify/import-playlist', { playlistUrl: trimmed })
       setResult(data)
       setStatus('success')
+      // Navigate to the new playlist after a short delay
+      if (data.playlistId) {
+        setTimeout(() => navigate(`/playlists/${data.playlistId}`), 1500)
+      }
     } catch (e) {
       setErr(e.response?.data?.error || 'Could not import. Check the URL and try again.')
       setStatus('error')

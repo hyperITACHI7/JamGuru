@@ -192,44 +192,38 @@ router.post('/import-playlist', authMiddleware, async (req, res) => {
       }
     }
 
+    let playlistMeta;
     let tracks;
+
     // Try user token first, then fall back to client credentials
     if (user?.spotifyAccessToken) {
       try {
-        tracks = await fetchTracks(user.spotifyAccessToken, true);
+        ({ tracks, ...playlistMeta } = await fetchTracks(user.spotifyAccessToken, true));
       } catch (err) {
         console.error('[import-playlist] User token failed, trying client credentials:', err.response?.status);
         const ccToken = await spotifyAuth.getClientCredentialsToken();
-        tracks = await fetchTracks(ccToken, false);
+        ({ tracks, ...playlistMeta } = await fetchTracks(ccToken, false));
       }
     } else {
       const ccToken = await spotifyAuth.getClientCredentialsToken();
-      tracks = await fetchTracks(ccToken, false);
+      ({ tracks, ...playlistMeta } = await fetchTracks(ccToken, false));
     }
 
     if (tracks.length === 0) {
-      return res.json({ imported: 0, added: 0, message: 'Playlist is empty or private' });
+      return res.json({ imported: 0, added: 0, playlistId: null });
     }
 
-    // Resolve each track to an iTunes record so we get a previewUrl.
-    // Use the same search-by-title-artist fallback already in GET /api/songs/:id.
+    // Resolve each track via iTunes to get a previewUrl
     const spotify = require('../services/spotify');
     const resolvedTracks = await Promise.all(
       tracks.map(async t => {
-        // Check if we already have this Spotify ID cached
         const cached = await prisma.song.findUnique({ where: { spotifyId: t.spotifyId } });
         if (cached) return cached;
-
-        // Try iTunes search to get a previewUrl
         try {
           const results = await spotify.searchTracks(`${t.title} ${t.artist}`);
-          const match   = results.find(r => r.previewUrl) ?? results[0];
-          if (match) {
-            return { ...match, spotifyId: t.spotifyId, cachedAt: new Date() };
-          }
+          const hit = results.find(r => r.previewUrl) ?? results[0];
+          if (hit) return { ...hit, spotifyId: t.spotifyId, cachedAt: new Date() };
         } catch { /* fall through */ }
-
-        // Store with Spotify metadata — previewUrl will resolve lazily on first play
         return { ...t, cachedAt: new Date() };
       })
     );
@@ -239,18 +233,39 @@ router.post('/import-playlist', authMiddleware, async (req, res) => {
       resolvedTracks.map(t =>
         prisma.song.upsert({
           where:  { spotifyId: t.spotifyId },
-          create: t,
-          update: { ...t, cachedAt: new Date() },
+          create: { spotifyId: t.spotifyId, title: t.title, artist: t.artist, album: t.album ?? '', albumArtUrl: t.albumArtUrl ?? null, previewUrl: t.previewUrl ?? null, cachedAt: new Date() },
+          update: { title: t.title, artist: t.artist, album: t.album ?? '', albumArtUrl: t.albumArtUrl ?? null, previewUrl: t.previewUrl ?? null, cachedAt: new Date() },
         })
       )
     );
 
-    // Fire-and-forget Last.fm tag enrichment
+    // Fire-and-forget Last.fm enrichment
     for (const t of resolvedTracks) {
       enrichSongTags(prisma, t.spotifyId, t.title, t.artist);
     }
 
-    // Upsert SongLikes
+    // Create the named playlist
+    const playlist = await prisma.playlist.create({
+      data: {
+        userId:      req.userId,
+        name:        playlistMeta.name,
+        description: playlistMeta.description,
+        coverUrl:    playlistMeta.coverUrl,
+        sourceUrl:   playlistUrl,
+      },
+    });
+
+    // Add songs to the playlist
+    await prisma.playlistSong.createMany({
+      data: resolvedTracks.map((t, i) => ({
+        playlistId: playlist.id,
+        spotifyId:  t.spotifyId,
+        position:   i,
+      })),
+      skipDuplicates: true,
+    });
+
+    // Auto-like all songs in the playlist
     let added = 0;
     for (const t of resolvedTracks) {
       const existing = await prisma.songLike.findUnique({
@@ -265,7 +280,7 @@ router.post('/import-playlist', authMiddleware, async (req, res) => {
     // Refresh taste profile in background
     refreshTasteProfile(prisma, req.userId).catch(() => {});
 
-    res.json({ imported: tracks.length, added });
+    res.json({ imported: tracks.length, added, playlistId: playlist.id, playlistName: playlist.name });
   } catch (err) {
     const status = err.response?.status;
     const spotifyMsg = err.response?.data?.error?.message || err.response?.data?.error || err.message;

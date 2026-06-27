@@ -141,15 +141,22 @@ async function getClientCredentialsToken() {
   return res.data.access_token;
 }
 
-// Fetch all tracks from a playlist (paginates automatically)
+// Fetch playlist metadata + all tracks (paginates automatically)
+// Returns { name, description, coverUrl, tracks }
 async function getPlaylistTracks(playlistId, accessToken) {
   const tracks = [];
 
-  // First page: use the playlist endpoint itself (broader access than /tracks sub-endpoint)
   const playlistRes = await axios.get(`${API_BASE}/playlists/${playlistId}`, {
     headers: { Authorization: `Bearer ${accessToken}` },
     params: { limit: 100 },
   });
+
+  const data = playlistRes.data;
+  const meta = {
+    name:        data.name || 'Imported Playlist',
+    description: data.description || null,
+    coverUrl:    data.images?.[0]?.url ?? null,
+  };
 
   function extractItems(items) {
     for (const item of (items || [])) {
@@ -166,19 +173,16 @@ async function getPlaylistTracks(playlistId, accessToken) {
     }
   }
 
-  extractItems(playlistRes.data.tracks?.items);
-  let nextUrl = playlistRes.data.tracks?.next;
+  extractItems(data.tracks?.items);
+  let nextUrl = data.tracks?.next;
 
-  // Subsequent pages via the /tracks endpoint
   while (nextUrl) {
-    const res = await axios.get(nextUrl, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
+    const res = await axios.get(nextUrl, { headers: { Authorization: `Bearer ${accessToken}` } });
     extractItems(res.data.items);
     nextUrl = res.data.next;
   }
 
-  return tracks;
+  return { ...meta, tracks };
 }
 
 module.exports = { getAuthUrl, exchangeCode, refreshAccessToken, getSpotifyProfile, getLikedTracks, getClientCredentialsToken, getPlaylistTracks };

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { Home, Search, Library, Plus, ChevronLeft, Heart, Crown, Music } from 'lucide-react'
 import api from '../../api/axios'
+import { getPlaylists } from '../../api/auth'
 
 function SpotifyCircle() {
   return (
@@ -13,7 +14,12 @@ function SpotifyCircle() {
 
 export default function Sidebar({ collapsed, setCollapsed }) {
   const [pendingCount, setPendingCount] = useState(0)
+  const [playlists, setPlaylists] = useState([])
   const navigate = useNavigate()
+
+  useEffect(() => {
+    getPlaylists().then(({ data }) => setPlaylists(data.playlists || [])).catch(() => {})
+  }, [])
 
   useEffect(() => {
     api.get('/recommendations/pending-count')
@@ -165,25 +171,42 @@ export default function Sidebar({ collapsed, setCollapsed }) {
             )}
           </NavLink>
 
-          <NavLink
-            to="/import-playlist"
-            title={collapsed ? 'Import Spotify Playlist' : ''}
-            className={({ isActive }) =>
-              `flex items-center py-2 rounded-md transition-colors ${
-                isActive ? 'bg-[#282828]' : 'hover:bg-[#1A1A1A]'
-              } ${collapsed ? 'justify-center px-1' : 'gap-3 px-3'}`
-            }
-          >
-            <div className="w-10 h-10 flex-shrink-0 rounded bg-[#282828] flex items-center justify-center">
-              <Music size={14} className="text-[#B3B3B3]" />
-            </div>
-            {!collapsed && (
-              <div className="overflow-hidden">
-                <p className="text-white text-sm font-medium truncate leading-tight">Import from Spotify</p>
-                <p className="text-[#B3B3B3] text-xs mt-0.5">Paste a playlist link</p>
+          {playlists.map(pl => (
+            <NavLink
+              key={pl.id}
+              to={`/playlists/${pl.id}`}
+              title={collapsed ? pl.name : ''}
+              className={({ isActive }) =>
+                `flex items-center py-2 rounded-md transition-colors ${
+                  isActive ? 'bg-[#282828]' : 'hover:bg-[#1A1A1A]'
+                } ${collapsed ? 'justify-center px-1' : 'gap-3 px-3'}`
+              }
+            >
+              <div className="w-10 h-10 flex-shrink-0 rounded overflow-hidden bg-[#282828]">
+                {pl.coverUrl
+                  ? <img src={pl.coverUrl} alt={pl.name} className="w-full h-full object-cover" />
+                  : <div className="w-full h-full flex items-center justify-center"><Music size={14} className="text-[#B3B3B3]" /></div>}
               </div>
-            )}
-          </NavLink>
+              {!collapsed && (
+                <div className="overflow-hidden">
+                  <p className="text-white text-sm font-medium truncate leading-tight">{pl.name}</p>
+                  <p className="text-[#B3B3B3] text-xs mt-0.5">Playlist</p>
+                </div>
+              )}
+            </NavLink>
+          ))}
+
+          {!collapsed && (
+            <button
+              onClick={() => navigate('/import-playlist')}
+              className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-[#1A1A1A] transition-colors w-full text-left"
+            >
+              <div className="w-10 h-10 flex-shrink-0 rounded bg-[#282828] flex items-center justify-center">
+                <Plus size={14} className="text-[#B3B3B3]" />
+              </div>
+              <p className="text-[#B3B3B3] text-sm">Import playlist</p>
+            </button>
+          )}
         </div>
       </div>
     </aside>
