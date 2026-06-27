@@ -165,43 +165,35 @@ async function getPlaylistTracksFromEmbed(playlistId) {
   console.log('[embed] pageProps keys:', Object.keys(pageProps || {}));
 
   // Spotify embed structure: pageProps.state.data.entity or similar
-  const state = pageProps?.state;
-  console.log('[embed] state keys:', Object.keys(state || {}));
-  const stateData = state?.data;
-  console.log('[embed] state.data keys:', Object.keys(stateData || {}));
-  const entity = stateData?.entity ?? pageProps?.entity ?? pageProps?.data;
-  console.log('[embed] entity keys:', Object.keys(entity || {}));
-  console.log('[embed] entity type:', entity?.type, 'name:', entity?.name);
-  console.log('[embed] entity.tracks:', JSON.stringify(entity?.tracks)?.slice(0, 300));
-  console.log('[embed] stateData sample (non-entity):', JSON.stringify(
-    Object.fromEntries(Object.entries(stateData || {}).filter(([k]) => k !== 'entity'))
-  ).slice(0, 500));
-
+  const entity = pageProps?.state?.data?.entity;
   if (!entity) {
-    console.log('[embed] full pageProps sample:', JSON.stringify(pageProps).slice(0, 500));
+    console.log('[embed] entity not found in __NEXT_DATA__');
     return null;
   }
 
+  console.log(`[embed] found entity "${entity.name}" with ${entity.trackList?.length ?? 0} trackList entries`);
+  if (entity.trackList?.length > 0) {
+    console.log('[embed] first trackList item sample:', JSON.stringify(entity.trackList[0]).slice(0, 300));
+  }
+
   const tracks = [];
-  const items = entity?.tracks?.items ?? entity?.trackList ?? entity?.items ?? stateData?.items ?? [];
-  for (const item of items) {
-    const t = item?.track ?? item;
-    if (!t?.id) continue;
-    if (t.type && t.type !== 'track') continue;
-    tracks.push({
-      spotifyId:   t.id,
-      title:       t.name,
-      artist:      (t.artists || []).map(a => a.name).join(', '),
-      album:       t.album?.name ?? '',
-      albumArtUrl: t.album?.images?.[0]?.url ?? null,
-      previewUrl:  t.preview_url ?? null,
-    });
+  for (const item of (entity.trackList || [])) {
+    // trackList items have uid, id, title, subtitle (artist), album, isPlayable, etc.
+    const id = item?.id ?? item?.track?.id;
+    const title = item?.title ?? item?.track?.name ?? item?.name;
+    const artist = item?.subtitle ?? (item?.artists || item?.track?.artists || []).map(a => a.name).join(', ');
+    const albumName = item?.album?.name ?? item?.track?.album?.name ?? '';
+    const albumArt = item?.album?.images?.[0]?.url ?? item?.track?.album?.images?.[0]?.url
+      ?? item?.coverArt?.sources?.[0]?.url ?? null;
+    const preview = item?.preview_url ?? item?.track?.preview_url ?? null;
+    if (!id || !title) continue;
+    tracks.push({ spotifyId: id, title, artist: artist || '', album: albumName, albumArtUrl: albumArt, previewUrl: preview });
   }
 
   return {
     name:        entity.name || 'Imported Playlist',
     description: entity.description || null,
-    coverUrl:    entity.images?.[0]?.url ?? entity.coverArt?.sources?.[0]?.url ?? null,
+    coverUrl:    entity.coverArt?.sources?.[0]?.url ?? null,
     tracks,
   };
 }
