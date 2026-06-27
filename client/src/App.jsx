@@ -14,6 +14,7 @@ import Friends     from './phase3/pages/Friends'
 import Groups      from './phase5/pages/Groups'
 import GroupDetail from './phase5/pages/GroupDetail'
 import LikedSongs  from './pages/LikedSongs'
+import Library     from './pages/Library'
 
 function ProtectedRoute({ children }) {
   return localStorage.getItem('token') ? children : <Navigate to="/login" replace />
@@ -49,6 +50,7 @@ export default function App() {
         <Route path="/groups"            element={<AppLayout><Groups /></AppLayout>} />
         <Route path="/groups/:id"        element={<AppLayout><GroupDetail /></AppLayout>} />
         <Route path="/liked-songs"       element={<AppLayout><LikedSongs /></AppLayout>} />
+        <Route path="/library"           element={<AppLayout><Library /></AppLayout>} />
 
         {/* Catch-all */}
         <Route path="*" element={<Navigate to="/" replace />} />

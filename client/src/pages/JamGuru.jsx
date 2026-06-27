@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Crown, UserPlus, RefreshCw } from 'lucide-react'
+import { Crown, UserPlus, RefreshCw, MessageCircle, X } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import TopBar from '../components/layout/TopBar'
 import RecommendationCard from '../phase3/components/RecommendationCard'
@@ -13,6 +13,7 @@ import { getJamGuruCount } from '../phase4/api/jamguru'
 export default function JamGuru() {
   const [inbox, setInbox]                     = useState([])
   const [loading, setLoading]                 = useState(true)
+  const [showMobileMessages, setShowMobileMessages] = useState(false)
   const [refreshing, setRefreshing]           = useState(false)
   const [error, setError]                     = useState(null)
   const [sort, setSort]                       = useState('latest')
@@ -46,8 +47,38 @@ export default function JamGuru() {
       {/* Gradient header — full width */}
       <div className="relative flex-shrink-0">
         <div className="absolute inset-0 bg-gradient-to-b from-emerald-900/70 via-[#121212]/60 to-transparent pointer-events-none" />
-        <TopBar transparent />
+        <TopBar
+          transparent
+          rightExtra={
+            <button
+              className="md:hidden w-9 h-9 rounded-full bg-[#282828] hover:bg-[#3e3e3e] flex items-center justify-center transition-colors"
+              onClick={() => setShowMobileMessages(true)}
+              title="Messages"
+            >
+              <MessageCircle size={18} className="text-white" />
+            </button>
+          }
+        />
       </div>
+
+      {/* Mobile messages overlay */}
+      {showMobileMessages && (
+        <div className="md:hidden fixed inset-0 z-50 flex">
+          <div className="flex-1 bg-black/60" onClick={() => setShowMobileMessages(false)} />
+          <div className="w-[280px] h-full bg-[#121212] flex flex-col overflow-hidden shadow-2xl">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 flex-shrink-0">
+              <span className="text-white font-semibold text-sm">Messages</span>
+              <button onClick={() => setShowMobileMessages(false)} className="text-[#B3B3B3] hover:text-white transition-colors">
+                <X size={18} />
+              </button>
+            </div>
+            <FriendsDmPanel
+              selected={selectedEntity}
+              onSelect={(e) => { setSelectedEntity(e); setShowMobileMessages(false) }}
+            />
+          </div>
+        </div>
+      )}
 
       {/* 2-column body */}
       <div className="flex flex-1 min-h-0 overflow-hidden">
@@ -178,8 +209,10 @@ export default function JamGuru() {
           )}
         </div>
 
-        {/* Right — friends/groups DM panel */}
-        <FriendsDmPanel selected={selectedEntity} onSelect={setSelectedEntity} />
+        {/* Right — friends/groups DM panel (desktop only) */}
+        <div className="hidden md:flex">
+          <FriendsDmPanel selected={selectedEntity} onSelect={setSelectedEntity} />
+        </div>
       </div>
     </div>
   )

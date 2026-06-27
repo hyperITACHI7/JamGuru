@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import { ChevronLeft, ChevronRight, Bell, User } from 'lucide-react'
 
-export default function TopBar({ transparent = false, showNav = true }) {
+export default function TopBar({ transparent = false, showNav = true, rightExtra = null }) {
   const navigate = useNavigate()
   const user = JSON.parse(localStorage.getItem('user') || '{}')
 
@@ -34,6 +34,7 @@ export default function TopBar({ transparent = false, showNav = true }) {
 
       {/* Right controls */}
       <div className="flex items-center gap-3">
+        {rightExtra}
         <button className="bg-white text-black text-xs font-bold px-4 py-1.5 rounded-full hover:scale-105 transition-transform">
           Upgrade
         </button>
