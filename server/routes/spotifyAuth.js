@@ -174,6 +174,19 @@ router.post('/import-playlist', authMiddleware, async (req, res) => {
   const playlistId = match[1];
   console.log(`[import-playlist] extracted playlistId="${playlistId}" from "${playlistUrl}"`);
 
+  // Log what scopes the stored user token actually has
+  try {
+    const user = await prisma.user.findUnique({ where: { id: req.userId }, select: { spotifyAccessToken: true } });
+    if (user?.spotifyAccessToken) {
+      const parts = user.spotifyAccessToken.split('.');
+      if (parts.length === 3) {
+        const payload = JSON.parse(Buffer.from(parts[1] + '==', 'base64').toString());
+        console.log('[import-playlist] token scopes:', payload.scope || payload.scp || 'not found in token');
+        console.log('[import-playlist] token exp:', payload.exp ? new Date(payload.exp * 1000).toISOString() : 'unknown');
+      }
+    }
+  } catch (e) { console.log('[import-playlist] could not decode token:', e.message); }
+
   try {
     const user = await prisma.user.findUnique({ where: { id: req.userId } });
 
