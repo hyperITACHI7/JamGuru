@@ -152,6 +152,8 @@ async function getPlaylistTracks(playlistId, accessToken) {
   });
 
   const data = playlistRes.data;
+  console.log(`[getPlaylistTracks] "${data.name}" total=${data.tracks?.total} items=${data.tracks?.items?.length}`);
+
   const meta = {
     name:        data.name || 'Imported Playlist',
     description: data.description || null,
@@ -161,7 +163,9 @@ async function getPlaylistTracks(playlistId, accessToken) {
   function extractItems(items) {
     for (const item of (items || [])) {
       const t = item?.track;
-      if (!t || !t.id || (t.type && t.type !== 'track')) continue;
+      // Skip local files (no id) and non-track types; allow items with no type field
+      if (!t || !t.id) continue;
+      if (t.type && t.type !== 'track') continue;
       tracks.push({
         spotifyId:   t.id,
         title:       t.name,

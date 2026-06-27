@@ -46,14 +46,22 @@ export default function ImportPlaylist() {
               <Check size={40} className="text-[#1DB954]" />
             </div>
             <p className="text-white font-bold text-xl mb-2">Done!</p>
-            <p className="text-[#B3B3B3] text-sm mb-1">
-              {result.imported} song{result.imported !== 1 ? 's' : ''} found in playlist
-            </p>
-            <p className="text-[#1DB954] text-sm font-semibold">
-              {result.added > 0
-                ? `${result.added} new song${result.added !== 1 ? 's' : ''} added to your library`
-                : 'All songs already in your library'}
-            </p>
+            {result.imported === 0 ? (
+              <p className="text-[#B3B3B3] text-sm">
+                No songs found — the playlist may be empty or contain only local files.
+              </p>
+            ) : (
+              <>
+                <p className="text-[#B3B3B3] text-sm mb-1">
+                  {result.imported} song{result.imported !== 1 ? 's' : ''} found in playlist
+                </p>
+                <p className="text-[#1DB954] text-sm font-semibold">
+                  {result.added > 0
+                    ? `${result.added} new song${result.added !== 1 ? 's' : ''} added to your library`
+                    : 'All songs already in your library'}
+                </p>
+              </>
+            )}
             <p className="text-[#535353] text-xs mt-3">Your recommendations have been updated</p>
             <button
               type="button"
