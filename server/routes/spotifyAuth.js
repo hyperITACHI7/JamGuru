@@ -172,6 +172,7 @@ router.post('/import-playlist', authMiddleware, async (req, res) => {
   const match = playlistUrl.match(/playlist[:/]([A-Za-z0-9]+)/);
   if (!match) return res.status(400).json({ error: 'Could not parse playlist ID from URL' });
   const playlistId = match[1];
+  console.log(`[import-playlist] extracted playlistId="${playlistId}" from "${playlistUrl}"`);
 
   try {
     const user = await prisma.user.findUnique({ where: { id: req.userId } });
@@ -285,6 +286,11 @@ router.post('/import-playlist', authMiddleware, async (req, res) => {
     const status = err.response?.status;
     const spotifyMsg = err.response?.data?.error?.message || err.response?.data?.error || err.message;
     console.error(`[import-playlist] Final error ${status}:`, spotifyMsg);
+    if (status === 404) {
+      return res.status(400).json({
+        error: 'Playlist not found. Spotify blocks importing of algorithmic playlists (Discover Weekly, Daily Mix, Release Radar, etc.). Try a regular user-created playlist instead.',
+      });
+    }
     res.status(502).json({ error: `Import failed (${status ?? 'network'}): ${spotifyMsg}` });
   }
 });
