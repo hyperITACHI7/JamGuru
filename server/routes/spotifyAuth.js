@@ -159,8 +159,9 @@ async function persistLikes(userId, tracks, res) {
 }
 
 // ── POST /api/auth/spotify/import-playlist ────────────────────────────────────
-// Import all songs from any public Spotify playlist URL into Liked Songs.
-// Uses client credentials — no user Spotify account needed.
+// Import all songs from a Spotify playlist URL into Liked Songs.
+// Prefers the user's own Spotify token (works for private playlists too).
+// Falls back to client credentials for users without a linked Spotify account.
 router.post('/import-playlist', authMiddleware, async (req, res) => {
   const { playlistUrl } = req.body;
   if (!playlistUrl) return res.status(400).json({ error: 'playlistUrl is required' });
@@ -173,8 +174,30 @@ router.post('/import-playlist', authMiddleware, async (req, res) => {
   const playlistId = match[1];
 
   try {
-    const token  = await spotifyAuth.getClientCredentialsToken();
-    const tracks = await spotifyAuth.getPlaylistTracks(playlistId, token);
+    // Prefer user's Spotify token — can access private playlists
+    let token;
+    const user = await prisma.user.findUnique({ where: { id: req.userId } });
+    if (user?.spotifyAccessToken) {
+      token = user.spotifyAccessToken;
+    } else {
+      token = await spotifyAuth.getClientCredentialsToken();
+    }
+
+    let tracks;
+    try {
+      tracks = await spotifyAuth.getPlaylistTracks(playlistId, token);
+    } catch (err) {
+      // Token expired — refresh and retry
+      if (err.response?.status === 401 && user?.spotifyRefreshToken) {
+        token = await spotifyAuth.refreshAccessToken(user.spotifyRefreshToken);
+        await prisma.user.update({ where: { id: req.userId }, data: { spotifyAccessToken: token } });
+        tracks = await spotifyAuth.getPlaylistTracks(playlistId, token);
+      } else if (err.response?.status === 403 || err.response?.status === 404) {
+        return res.status(400).json({ error: 'Playlist not found or is private. Make sure the playlist is set to Public in Spotify.' });
+      } else {
+        throw err;
+      }
+    }
 
     if (tracks.length === 0) {
       return res.json({ imported: 0, added: 0, message: 'Playlist is empty or private' });
