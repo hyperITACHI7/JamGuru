@@ -146,14 +146,12 @@ async function getClientCredentialsToken() {
 async function getPlaylistTracks(playlistId, accessToken) {
   const tracks = [];
 
+  // Step 1: get metadata (name, cover) from the base playlist endpoint
   const playlistRes = await axios.get(`${API_BASE}/playlists/${playlistId}`, {
     headers: { Authorization: `Bearer ${accessToken}` },
-    params: { limit: 100 },
   });
 
   const data = playlistRes.data;
-  console.log(`[getPlaylistTracks] "${data.name}" total=${data.tracks?.total} items=${data.tracks?.items?.length}`);
-
   const meta = {
     name:        data.name || 'Imported Playlist',
     description: data.description || null,
@@ -163,7 +161,6 @@ async function getPlaylistTracks(playlistId, accessToken) {
   function extractItems(items) {
     for (const item of (items || [])) {
       const t = item?.track;
-      // Skip local files (no id) and non-track types; allow items with no type field
       if (!t || !t.id) continue;
       if (t.type && t.type !== 'track') continue;
       tracks.push({
@@ -177,15 +174,25 @@ async function getPlaylistTracks(playlistId, accessToken) {
     }
   }
 
+  // Step 2: try embedded tracks first (fast path)
   extractItems(data.tracks?.items);
-  let nextUrl = data.tracks?.next;
+  const total = data.tracks?.total ?? 0;
+  console.log(`[getPlaylistTracks] "${data.name}" total=${total} embedded=${tracks.length}`);
+
+  // Step 3: if embedded items are missing but total > 0, fetch via /tracks endpoint
+  let nextUrl = tracks.length < total
+    ? `${API_BASE}/playlists/${playlistId}/tracks?limit=100`
+    : data.tracks?.next;
 
   while (nextUrl) {
     const res = await axios.get(nextUrl, { headers: { Authorization: `Bearer ${accessToken}` } });
+    const before = tracks.length;
     extractItems(res.data.items);
+    console.log(`[getPlaylistTracks] paginated +${tracks.length - before} (total so far: ${tracks.length})`);
     nextUrl = res.data.next;
   }
 
+  console.log(`[getPlaylistTracks] done, extracted ${tracks.length} tracks`);
   return { ...meta, tracks };
 }
 
