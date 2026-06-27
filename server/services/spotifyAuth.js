@@ -167,8 +167,15 @@ async function getPlaylistTracksFromEmbed(playlistId) {
   // Spotify embed structure: pageProps.state.data.entity or similar
   const state = pageProps?.state;
   console.log('[embed] state keys:', Object.keys(state || {}));
-  const entity = state?.data?.entity ?? pageProps?.entity ?? pageProps?.data;
-  console.log('[embed] entity type:', entity?.type, 'name:', entity?.name, 'trackCount:', entity?.trackCount ?? entity?.tracks?.items?.length);
+  const stateData = state?.data;
+  console.log('[embed] state.data keys:', Object.keys(stateData || {}));
+  const entity = stateData?.entity ?? pageProps?.entity ?? pageProps?.data;
+  console.log('[embed] entity keys:', Object.keys(entity || {}));
+  console.log('[embed] entity type:', entity?.type, 'name:', entity?.name);
+  console.log('[embed] entity.tracks:', JSON.stringify(entity?.tracks)?.slice(0, 300));
+  console.log('[embed] stateData sample (non-entity):', JSON.stringify(
+    Object.fromEntries(Object.entries(stateData || {}).filter(([k]) => k !== 'entity'))
+  ).slice(0, 500));
 
   if (!entity) {
     console.log('[embed] full pageProps sample:', JSON.stringify(pageProps).slice(0, 500));
@@ -176,7 +183,7 @@ async function getPlaylistTracksFromEmbed(playlistId) {
   }
 
   const tracks = [];
-  const items = entity?.tracks?.items ?? entity?.items ?? [];
+  const items = entity?.tracks?.items ?? entity?.trackList ?? entity?.items ?? stateData?.items ?? [];
   for (const item of items) {
     const t = item?.track ?? item;
     if (!t?.id) continue;
