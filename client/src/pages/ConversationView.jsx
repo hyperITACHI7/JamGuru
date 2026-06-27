@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { ArrowLeft, Play, Pause, Heart, Music, MessageCircle, Sparkles, Send, X, ChevronRight, ThumbsDown, Plus, Search } from 'lucide-react'
+import { ArrowLeft, Play, Pause, Heart, Music, MessageCircle, Sparkles, Send, X, ChevronRight, ThumbsDown, Plus, Search, ChevronLeft, ListMusic } from 'lucide-react'
 import FriendProfileSheet from '../components/FriendProfileSheet'
 import { getConversation, sendRecommendation } from '../phase3/api/recommendations'
 import {
@@ -8,6 +8,7 @@ import {
   dislikeRecommendation, undislikeRecommendation,
 } from '../phase4/api/likes'
 import { getLikedSongs } from '../api/songs'
+import { getPlaylists, getPlaylist } from '../api/auth'
 import FeedbackTags from '../phase4/components/FeedbackTags'
 import { usePlayer } from '../context/PlayerContext'
 import { getAiSuggestion } from '../phase7/api/ai'
@@ -65,7 +66,6 @@ function Bubble({ msg, onLike, justLiked }) {
         isSent ? 'bg-[#1DB954]/15 rounded-tr-sm' : 'bg-[#282828] rounded-tl-sm'
       } ${dislikeActive ? 'opacity-60' : ''}`}>
 
-        {/* Song row */}
         <div className="flex items-center gap-2.5">
           <div className="w-11 h-11 flex-shrink-0 rounded-lg overflow-hidden bg-[#3e3e3e]">
             {msg.song.albumArtUrl
@@ -78,7 +78,6 @@ function Bubble({ msg, onLike, justLiked }) {
             <p className="text-[#B3B3B3] text-[10px] truncate mt-0.5">{msg.song.artist}</p>
           </div>
 
-          {/* Right column: play on top, like below (received only) */}
           {!isSent ? (
             <div className="flex flex-col items-center gap-1.5 flex-shrink-0">
               {msg.song.previewUrl && (
@@ -95,11 +94,9 @@ function Bubble({ msg, onLike, justLiked }) {
                 onClick={() => onLike(msg)}
                 disabled={anyReaction}
                 className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${
-                  msg.liked
-                    ? 'text-[#1DB954] hover:text-red-400'
-                    : anyReaction
-                      ? 'text-[#333] cursor-not-allowed'
-                      : 'text-[#B3B3B3] hover:text-white'
+                  msg.liked ? 'text-[#1DB954] hover:text-red-400'
+                    : anyReaction ? 'text-[#333] cursor-not-allowed'
+                    : 'text-[#B3B3B3] hover:text-white'
                 }`}
               >
                 <Heart size={14} fill={msg.liked ? 'currentColor' : 'none'} />
@@ -123,12 +120,9 @@ function Bubble({ msg, onLike, justLiked }) {
           <p className="text-white/60 text-xs italic mt-2 leading-relaxed">"{msg.context}"</p>
         )}
 
-        {/* SENT — recipient reaction */}
         {isSent && (
           <div className="mt-2 flex items-center gap-2 flex-wrap">
-            <span className={`flex items-center gap-1 text-[10px] font-medium ${
-              msg.liked ? 'text-[#1DB954]' : 'text-[#535353]'
-            }`}>
+            <span className={`flex items-center gap-1 text-[10px] font-medium ${msg.liked ? 'text-[#1DB954]' : 'text-[#535353]'}`}>
               {msg.liked
                 ? <><Heart size={9} fill="currentColor" /> Loved it</>
                 : msg.dismissed
@@ -137,22 +131,17 @@ function Bubble({ msg, onLike, justLiked }) {
               }
             </span>
             {msg.tags.map(tag => (
-              <span key={tag} className="text-[9px] bg-[#1DB954]/20 text-[#1DB954] px-1.5 py-0.5 rounded-full font-semibold">
-                {tag}
-              </span>
+              <span key={tag} className="text-[9px] bg-[#1DB954]/20 text-[#1DB954] px-1.5 py-0.5 rounded-full font-semibold">{tag}</span>
             ))}
           </div>
         )}
 
-        {/* RECEIVED — tag picker + bottom reaction row */}
         {!isSent && (
           <>
             {msg.liked && !justLiked && msg.tags.length > 0 && (
               <div className="flex flex-wrap gap-1 mt-2 mb-1">
                 {msg.tags.map(tag => (
-                  <span key={tag} className="text-[9px] bg-white/10 text-white/70 px-1.5 py-0.5 rounded-full font-semibold">
-                    {tag}
-                  </span>
+                  <span key={tag} className="text-[9px] bg-white/10 text-white/70 px-1.5 py-0.5 rounded-full font-semibold">{tag}</span>
                 ))}
               </div>
             )}
@@ -163,11 +152,9 @@ function Bubble({ msg, onLike, justLiked }) {
                 onClick={handleDismiss}
                 disabled={msg.liked || dislikeActive || tagPickerOpen}
                 className={`text-[10px] font-medium transition-colors ${
-                  dismissActive
-                    ? 'text-white'
-                    : msg.liked || dislikeActive || tagPickerOpen
-                      ? 'text-[#333] cursor-not-allowed'
-                      : 'text-[#535353] hover:text-[#B3B3B3]'
+                  dismissActive ? 'text-white'
+                    : msg.liked || dislikeActive || tagPickerOpen ? 'text-[#333] cursor-not-allowed'
+                    : 'text-[#535353] hover:text-[#B3B3B3]'
                 }`}
               >
                 Not for me
@@ -176,11 +163,9 @@ function Bubble({ msg, onLike, justLiked }) {
                 onClick={handleDislike}
                 disabled={msg.liked || dismissActive || tagPickerOpen}
                 className={`flex items-center gap-1 text-[10px] font-medium transition-colors ${
-                  dislikeActive
-                    ? 'text-red-400'
-                    : msg.liked || dismissActive || tagPickerOpen
-                      ? 'text-[#333] cursor-not-allowed'
-                      : 'text-[#535353] hover:text-red-400'
+                  dislikeActive ? 'text-red-400'
+                    : msg.liked || dismissActive || tagPickerOpen ? 'text-[#333] cursor-not-allowed'
+                    : 'text-[#535353] hover:text-red-400'
                 }`}
               >
                 <ThumbsDown size={9} fill={dislikeActive ? 'currentColor' : 'none'} />
@@ -202,21 +187,25 @@ export default function ConversationView({ friend, onBack }) {
   const [liking, setLiking]             = useState(null)
   const [justLikedIds, setJustLikedIds] = useState(new Set())
 
-  // AI suggest state
+  // Compose state
   const [suggesting, setSuggesting]     = useState(false)
-  const [suggested, setSuggested]       = useState(null) // { song, aiQuery? }
+  const [suggested, setSuggested]       = useState(null)
   const [suggestNote, setSuggestNote]   = useState('')
   const [sending, setSending]           = useState(false)
   const [suggestError, setSuggestError] = useState('')
 
-  // Library picker state
-  const [showLibrary, setShowLibrary]       = useState(false)
-  const [librarySongs, setLibrarySongs]     = useState([])
-  const [libraryLoading, setLibraryLoading] = useState(false)
-  const [librarySearch, setLibrarySearch]   = useState('')
+  // Library picker — two-level: playlists → songs
+  const [showLibrary, setShowLibrary]         = useState(false)
+  const [libraryView, setLibraryView]         = useState('playlists') // 'playlists' | 'songs'
+  const [playlists, setPlaylists]             = useState([])
+  const [playlistsLoading, setPlaylistsLoading] = useState(false)
+  const [activePlaylist, setActivePlaylist]   = useState(null)
+  const [librarySongs, setLibrarySongs]       = useState([])
+  const [libraryLoading, setLibraryLoading]   = useState(false)
+  const [librarySearch, setLibrarySearch]     = useState('')
 
-  const bottomRef    = useRef(null)
-  const searchRef    = useRef(null)
+  const bottomRef = useRef(null)
+  const searchRef = useRef(null)
 
   useEffect(() => {
     setLoading(true)
@@ -231,24 +220,48 @@ export default function ConversationView({ friend, onBack }) {
     if (!loading) bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [loading, messages.length])
 
-  // Focus search when library opens
   useEffect(() => {
-    if (showLibrary) {
-      setTimeout(() => searchRef.current?.focus(), 50)
-    }
-  }, [showLibrary])
+    if (showLibrary) setTimeout(() => searchRef.current?.focus(), 50)
+  }, [showLibrary, libraryView])
 
   async function openLibrary() {
     setShowLibrary(true)
+    setLibraryView('playlists')
     setLibrarySearch('')
-    if (librarySongs.length === 0) {
-      setLibraryLoading(true)
+    setActivePlaylist(null)
+    setLibrarySongs([])
+    if (playlists.length === 0) {
+      setPlaylistsLoading(true)
       try {
+        const { data } = await getPlaylists()
+        setPlaylists(data.playlists || [])
+      } catch (_) {}
+      setPlaylistsLoading(false)
+    }
+  }
+
+  async function selectPlaylist(playlist) {
+    setActivePlaylist(playlist)
+    setLibraryView('songs')
+    setLibrarySearch('')
+    setLibraryLoading(true)
+    try {
+      if (playlist.type === 'liked') {
         const { data } = await getLikedSongs()
         setLibrarySongs(data.songs || [])
-      } catch (_) {}
-      setLibraryLoading(false)
-    }
+      } else {
+        const { data } = await getPlaylist(playlist.id)
+        setLibrarySongs((data.playlist?.songs || []).map(ps => ps.song))
+      }
+    } catch (_) {}
+    setLibraryLoading(false)
+  }
+
+  function backToPlaylists() {
+    setLibraryView('playlists')
+    setLibrarySearch('')
+    setActivePlaylist(null)
+    setLibrarySongs([])
   }
 
   function selectSong(song) {
@@ -257,14 +270,18 @@ export default function ConversationView({ friend, onBack }) {
     setSuggestError('')
     setShowLibrary(false)
     setLibrarySearch('')
+    setLibraryView('playlists')
   }
 
-  const filteredSongs = librarySearch.trim()
-    ? librarySongs.filter(s =>
-        s.title.toLowerCase().includes(librarySearch.toLowerCase()) ||
-        s.artist.toLowerCase().includes(librarySearch.toLowerCase())
+  const filtered = librarySearch.trim()
+    ? (libraryView === 'playlists'
+        ? playlists.filter(p => p.name.toLowerCase().includes(librarySearch.toLowerCase()))
+        : librarySongs.filter(s =>
+            s.title.toLowerCase().includes(librarySearch.toLowerCase()) ||
+            s.artist.toLowerCase().includes(librarySearch.toLowerCase())
+          )
       )
-    : librarySongs
+    : libraryView === 'playlists' ? playlists : librarySongs
 
   async function handleLike(msg) {
     if (liking === msg.id) return
@@ -361,9 +378,7 @@ export default function ConversationView({ friend, onBack }) {
           <div className="flex flex-col items-center justify-center h-full text-center px-6 py-16">
             <MessageCircle size={40} className="text-[#535353] mb-3" />
             <p className="text-white font-semibold mb-1">No songs shared yet</p>
-            <p className="text-[#B3B3B3] text-sm">
-              Share a song with {friend.displayName} to start the conversation
-            </p>
+            <p className="text-[#B3B3B3] text-sm">Share a song with {friend.displayName} to start the conversation</p>
           </div>
         ) : (
           <>
@@ -371,30 +386,31 @@ export default function ConversationView({ friend, onBack }) {
               Your conversation with {friend.displayName}
             </p>
             {messages.map(msg => (
-              <Bubble
-                key={msg.id}
-                msg={msg}
-                onLike={handleLike}
-                justLiked={justLikedIds.has(msg.id)}
-              />
+              <Bubble key={msg.id} msg={msg} onLike={handleLike} justLiked={justLikedIds.has(msg.id)} />
             ))}
             <div ref={bottomRef} />
           </>
         )}
       </div>
 
-      {/* Library picker — slides up between chat and compose bar */}
+      {/* Library picker panel — two-level */}
       {showLibrary && (
-        <div className="flex-shrink-0 border-t border-white/5 bg-[#181818] flex flex-col" style={{ maxHeight: '280px' }}>
-          {/* Library header + search */}
+        <div className="flex-shrink-0 border-t border-white/5 bg-[#181818] flex flex-col" style={{ maxHeight: '300px' }}>
+
+          {/* Panel header */}
           <div className="flex items-center gap-2 px-4 pt-3 pb-2 flex-shrink-0">
+            {libraryView === 'songs' && (
+              <button onClick={backToPlaylists} className="text-[#B3B3B3] hover:text-white transition-colors flex-shrink-0">
+                <ChevronLeft size={18} />
+              </button>
+            )}
             <div className="flex-1 flex items-center gap-2 bg-[#282828] rounded-full px-3 py-1.5">
               <Search size={12} className="text-[#535353] flex-shrink-0" />
               <input
                 ref={searchRef}
                 value={librarySearch}
                 onChange={e => setLibrarySearch(e.target.value)}
-                placeholder="Search your library…"
+                placeholder={libraryView === 'playlists' ? 'Search playlists…' : `Search in ${activePlaylist?.name}…`}
                 className="flex-1 bg-transparent text-white text-xs focus:outline-none placeholder-[#535353]"
               />
               {librarySearch && (
@@ -403,45 +419,103 @@ export default function ConversationView({ friend, onBack }) {
                 </button>
               )}
             </div>
-            <button
-              onClick={() => setShowLibrary(false)}
-              className="text-[#535353] hover:text-white transition-colors flex-shrink-0"
-            >
+            <button onClick={() => setShowLibrary(false)} className="text-[#535353] hover:text-white transition-colors flex-shrink-0">
               <X size={16} />
             </button>
           </div>
 
-          {/* Song list */}
-          <div className="overflow-y-auto flex-1">
-            {libraryLoading ? (
-              <div className="flex items-center justify-center py-8">
-                <div className="w-5 h-5 border-2 border-[#1DB954] border-t-transparent rounded-full animate-spin" />
-              </div>
-            ) : filteredSongs.length === 0 ? (
-              <p className="text-center text-[#535353] text-xs py-8">
-                {librarySearch ? 'No songs match your search' : 'Your library is empty'}
-              </p>
-            ) : (
-              filteredSongs.map(song => (
-                <button
-                  key={song.spotifyId}
-                  onClick={() => selectSong(song)}
-                  className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/5 transition-colors text-left"
-                >
-                  <div className="w-9 h-9 flex-shrink-0 rounded-md overflow-hidden bg-[#282828]">
-                    {song.albumArtUrl
-                      ? <img src={song.albumArtUrl} alt={song.title} className="w-full h-full object-cover" />
-                      : <div className="w-full h-full flex items-center justify-center"><Music size={12} className="text-[#535353]" /></div>
-                    }
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-white text-xs font-medium truncate">{song.title}</p>
-                    <p className="text-[#B3B3B3] text-[10px] truncate mt-0.5">{song.artist}</p>
-                  </div>
-                </button>
-              ))
-            )}
-          </div>
+          {/* Playlist view */}
+          {libraryView === 'playlists' && (
+            <div className="overflow-y-auto flex-1">
+              {playlistsLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="w-5 h-5 border-2 border-[#1DB954] border-t-transparent rounded-full animate-spin" />
+                </div>
+              ) : (
+                <>
+                  {/* Liked Songs — always first */}
+                  <button
+                    onClick={() => selectPlaylist({ type: 'liked', name: 'Liked Songs' })}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/5 transition-colors text-left"
+                  >
+                    <div className="w-10 h-10 flex-shrink-0 rounded-md bg-gradient-to-br from-[#450af5] to-[#c4efd9] flex items-center justify-center">
+                      <Heart size={16} className="text-white fill-white" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-white text-xs font-medium">Liked Songs</p>
+                      <p className="text-[#B3B3B3] text-[10px] mt-0.5">Your liked songs</p>
+                    </div>
+                    <ChevronRight size={14} className="text-[#535353] flex-shrink-0" />
+                  </button>
+
+                  {/* Imported playlists */}
+                  {filtered.length === 0 && !playlistsLoading && librarySearch ? (
+                    <p className="text-center text-[#535353] text-xs py-4">No playlists match</p>
+                  ) : (
+                    filtered.map(pl => (
+                      <button
+                        key={pl.id}
+                        onClick={() => selectPlaylist({ ...pl, type: 'playlist' })}
+                        className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/5 transition-colors text-left"
+                      >
+                        <div className="w-10 h-10 flex-shrink-0 rounded-md overflow-hidden bg-[#282828]">
+                          {pl.coverUrl
+                            ? <img src={pl.coverUrl} alt={pl.name} className="w-full h-full object-cover" />
+                            : <div className="w-full h-full flex items-center justify-center"><ListMusic size={14} className="text-[#535353]" /></div>
+                          }
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-white text-xs font-medium truncate">{pl.name}</p>
+                          <p className="text-[#B3B3B3] text-[10px] mt-0.5">{pl._count?.songs ?? 0} songs</p>
+                        </div>
+                        <ChevronRight size={14} className="text-[#535353] flex-shrink-0" />
+                      </button>
+                    ))
+                  )}
+
+                  {playlists.length === 0 && !playlistsLoading && !librarySearch && (
+                    <p className="text-center text-[#535353] text-[10px] px-4 pb-4 pt-1">
+                      No imported playlists yet
+                    </p>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+
+          {/* Song view */}
+          {libraryView === 'songs' && (
+            <div className="overflow-y-auto flex-1">
+              {libraryLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="w-5 h-5 border-2 border-[#1DB954] border-t-transparent rounded-full animate-spin" />
+                </div>
+              ) : filtered.length === 0 ? (
+                <p className="text-center text-[#535353] text-xs py-8">
+                  {librarySearch ? 'No songs match' : 'This playlist is empty'}
+                </p>
+              ) : (
+                filtered.map(song => (
+                  <button
+                    key={song.spotifyId}
+                    onClick={() => selectSong(song)}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/5 transition-colors text-left"
+                  >
+                    <div className="w-9 h-9 flex-shrink-0 rounded-md overflow-hidden bg-[#282828]">
+                      {song.albumArtUrl
+                        ? <img src={song.albumArtUrl} alt={song.title} className="w-full h-full object-cover" />
+                        : <div className="w-full h-full flex items-center justify-center"><Music size={12} className="text-[#535353]" /></div>
+                      }
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-white text-xs font-medium truncate">{song.title}</p>
+                      <p className="text-[#B3B3B3] text-[10px] truncate mt-0.5">{song.artist}</p>
+                    </div>
+                  </button>
+                ))
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -449,7 +523,6 @@ export default function ConversationView({ friend, onBack }) {
       <div className="flex-shrink-0 border-t border-white/5 bg-[#181818] px-4 py-3">
         {suggested ? (
           <div className="space-y-2">
-            {/* Selected song preview */}
             <div className="flex items-center gap-3 bg-[#282828] rounded-xl p-2.5">
               <div className="w-10 h-10 flex-shrink-0 rounded-lg overflow-hidden bg-[#3e3e3e]">
                 {suggested.song.albumArtUrl
@@ -473,7 +546,6 @@ export default function ConversationView({ friend, onBack }) {
                 <X size={14} />
               </button>
             </div>
-            {/* Note input + send */}
             <div className="flex items-center gap-2">
               <input
                 value={suggestNote}
@@ -494,21 +566,15 @@ export default function ConversationView({ friend, onBack }) {
         ) : (
           <div className="flex items-center gap-2">
             <p className="text-[#535353] text-xs flex-1 truncate">Share a song with {friend.displayName}</p>
-
-            {/* Library picker button */}
             <button
               onClick={openLibrary}
               title="Pick from your library"
               className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 transition-colors ${
-                showLibrary
-                  ? 'bg-[#1DB954] text-black'
-                  : 'bg-[#282828] text-[#B3B3B3] hover:text-white hover:bg-[#3e3e3e]'
+                showLibrary ? 'bg-[#1DB954] text-black' : 'bg-[#282828] text-[#B3B3B3] hover:text-white hover:bg-[#3e3e3e]'
               }`}
             >
               <Plus size={15} />
             </button>
-
-            {/* AI suggest button */}
             <button
               onClick={handleAiSuggest}
               disabled={suggesting}
