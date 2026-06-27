@@ -154,7 +154,7 @@ async function getPlaylistTracks(playlistId, accessToken) {
   function extractItems(items) {
     for (const item of (items || [])) {
       const t = item?.track;
-      if (!t || !t.id || t.type !== 'track') continue;
+      if (!t || !t.id || (t.type && t.type !== 'track')) continue;
       tracks.push({
         spotifyId:   t.id,
         title:       t.name,

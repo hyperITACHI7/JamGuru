@@ -41,11 +41,13 @@ export default function ImportPlaylist() {
             </div>
             <p className="text-white font-bold text-xl mb-2">Done!</p>
             <p className="text-[#B3B3B3] text-sm mb-1">
-              {result.added} new song{result.added !== 1 ? 's' : ''} added to your library
+              {result.imported} song{result.imported !== 1 ? 's' : ''} found in playlist
             </p>
-            {result.imported !== result.added && (
-              <p className="text-[#535353] text-xs">{result.imported} total in playlist</p>
-            )}
+            <p className="text-[#1DB954] text-sm font-semibold">
+              {result.added > 0
+                ? `${result.added} new song${result.added !== 1 ? 's' : ''} added to your library`
+                : 'All songs already in your library'}
+            </p>
             <p className="text-[#535353] text-xs mt-3">Your recommendations have been updated</p>
             <button
               type="button"
