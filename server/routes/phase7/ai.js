@@ -1,7 +1,7 @@
 const express = require('express');
 const { PrismaClient } = require('@prisma/client');
 const auth = require('../../middleware/auth');
-const { suggestSong, suggestForMe, getInteractionContext, rankSongsForRequest } = require('../../services/ai');
+const { suggestSong, suggestForMe, getInteractionContext, rankSongsForRequest, suggestForGroup, rankSongsForGroupRequest } = require('../../services/ai');
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -91,6 +91,50 @@ router.post('/ai/rank-for-request', auth, async (req, res) => {
     res.json(result);
   } catch (e) {
     console.error('[ai/rank-for-request]', e.message);
+    res.status(500).json({ error: e.message || 'Failed to rank songs' });
+  }
+});
+
+// POST /api/ai/suggest/group/:groupId — AI song suggestion for a group
+router.post('/suggest/group/:groupId', auth, async (req, res) => {
+  try {
+    if (!process.env.AI_API_KEY || process.env.AI_API_KEY === 'your-groq-api-key-here') {
+      return res.status(503).json({ error: 'AI provider not configured' });
+    }
+    const membership = await prisma.groupMember.findUnique({
+      where: { groupId_userId: { groupId: req.params.groupId, userId: req.userId } },
+    });
+    if (!membership) return res.status(403).json({ error: 'You are not a member of this group' });
+
+    const { song, aiQuery } = await suggestForGroup(prisma, req.userId, req.params.groupId);
+    res.json({ song, aiQuery });
+  } catch (e) {
+    console.error('[ai/suggest/group]', e.message);
+    res.status(500).json({ error: e.message || 'AI suggestion failed' });
+  }
+});
+
+// POST /api/ai/rank-for-group-request — rank user's library against a group song request
+router.post('/rank-for-group-request', auth, async (req, res) => {
+  try {
+    if (!process.env.AI_API_KEY || process.env.AI_API_KEY === 'your-groq-api-key-here') {
+      return res.status(503).json({ error: 'AI provider not configured' });
+    }
+    const { requestId } = req.body;
+    if (!requestId) return res.status(400).json({ error: 'requestId is required' });
+
+    const songRequest = await prisma.groupSongRequest.findUnique({ where: { id: requestId } });
+    if (!songRequest) return res.status(404).json({ error: 'Request not found' });
+
+    const membership = await prisma.groupMember.findUnique({
+      where: { groupId_userId: { groupId: songRequest.groupId, userId: req.userId } },
+    });
+    if (!membership) return res.status(403).json({ error: 'You are not a member of this group' });
+
+    const result = await rankSongsForGroupRequest(prisma, req.userId, requestId);
+    res.json(result);
+  } catch (e) {
+    console.error('[ai/rank-for-group-request]', e.message);
     res.status(500).json({ error: e.message || 'Failed to rank songs' });
   }
 });

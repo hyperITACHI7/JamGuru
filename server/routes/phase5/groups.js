@@ -159,7 +159,7 @@ router.post('/:id/recommendations', auth, async (req, res) => {
     });
     if (!membership) return res.status(403).json({ error: 'You are not a member of this group' });
 
-    const { songId, context } = req.body;
+    const { songId, context, groupRequestId } = req.body;
     if (!songId) return res.status(400).json({ error: 'songId is required' });
     if (context && context.length > 200) return res.status(400).json({ error: 'Context must be 200 characters or fewer' });
 
@@ -172,12 +172,17 @@ router.post('/:id/recommendations', auth, async (req, res) => {
         groupId: req.params.id,
         songId,
         context: context?.trim() || null,
+        groupRequestId: groupRequestId ?? null,
       },
-      include: {
-        song: true,
-        sender: { select: SAFE_USER },
-      },
+      include: { song: true, sender: { select: SAFE_USER } },
     });
+
+    if (groupRequestId) {
+      await prisma.groupSongRequest.updateMany({
+        where: { id: groupRequestId, status: 'OPEN' },
+        data: { status: 'FULFILLED' },
+      });
+    }
 
     // Update group score — increment recsSent
     const today = todayDate();
@@ -201,7 +206,30 @@ router.post('/:id/recommendations', auth, async (req, res) => {
   }
 });
 
-// GET /api/groups/:id/feed — all recommendations sent to this group
+// POST /api/groups/:id/requests — send a song request to the group
+router.post('/:id/requests', auth, async (req, res) => {
+  try {
+    const membership = await prisma.groupMember.findUnique({
+      where: { groupId_userId: { groupId: req.params.id, userId: req.userId } },
+    });
+    if (!membership) return res.status(403).json({ error: 'You are not a member of this group' });
+
+    const { templateId, variables, renderedText } = req.body;
+    if (!templateId || !variables || !renderedText) {
+      return res.status(400).json({ error: 'templateId, variables, and renderedText are required' });
+    }
+
+    const request = await prisma.groupSongRequest.create({
+      data: { groupId: req.params.id, senderId: req.userId, templateId, variables, renderedText, status: 'OPEN' },
+    });
+    res.status(201).json(request);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// GET /api/groups/:id/feed — recommendations + song requests, merged chronologically
 router.get('/:id/feed', auth, async (req, res) => {
   try {
     const membership = await prisma.groupMember.findUnique({
@@ -209,30 +237,45 @@ router.get('/:id/feed', auth, async (req, res) => {
     });
     if (!membership) return res.status(403).json({ error: 'You are not a member of this group' });
 
-    const recs = await prisma.recommendation.findMany({
-      where: { groupId: req.params.id },
-      include: {
-        song: true,
-        sender: { select: SAFE_USER },
-        likes: { where: { likerId: req.userId }, select: { id: true } },
-        _count: { select: { likes: true } },
-      },
-      orderBy: { sentAt: 'desc' },
-      take: 50,
-    });
+    const [recs, requests] = await Promise.all([
+      prisma.recommendation.findMany({
+        where: { groupId: req.params.id },
+        include: {
+          song: true,
+          sender: { select: SAFE_USER },
+          likes: { where: { likerId: req.userId }, select: { id: true } },
+          _count: { select: { likes: true } },
+        },
+        orderBy: { sentAt: 'desc' },
+        take: 50,
+      }),
+      prisma.groupSongRequest.findMany({
+        where: { groupId: req.params.id },
+        include: { sender: { select: SAFE_USER } },
+        orderBy: { sentAt: 'desc' },
+        take: 50,
+      }),
+    ]);
 
-    res.json(
-      recs.map(r => ({
-        id: r.id,
-        sentAt: r.sentAt,
-        context: r.context,
-        song: r.song,
-        sender: r.sender,
-        liked: r.likes.length > 0,
-        likeId: r.likes[0]?.id ?? null,
+    const combined = [
+      ...recs.map(r => ({
+        type: 'recommendation',
+        id: r.id, sentAt: r.sentAt, context: r.context,
+        song: r.song, sender: r.sender,
+        liked: r.likes.length > 0, likeId: r.likes[0]?.id ?? null,
         likeCount: r._count.likes,
-      }))
-    );
+        groupRequestId: r.groupRequestId ?? null,
+      })),
+      ...requests.map(r => ({
+        type: 'request',
+        id: r.id, sentAt: r.sentAt,
+        sender: r.sender, senderId: r.senderId,
+        templateId: r.templateId, variables: r.variables,
+        renderedText: r.renderedText, status: r.status,
+      })),
+    ].sort((a, b) => new Date(b.sentAt) - new Date(a.sentAt));
+
+    res.json(combined);
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'Server error' });
