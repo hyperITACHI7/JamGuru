@@ -141,23 +141,74 @@ async function getClientCredentialsToken() {
   return res.data.access_token;
 }
 
+// Fallback: extract tracks from Spotify's public embed page (no developer API needed)
+async function getPlaylistTracksFromEmbed(playlistId) {
+  const res = await axios.get(`https://open.spotify.com/embed/playlist/${playlistId}`, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      'Accept-Language': 'en-US,en;q=0.5',
+    },
+    timeout: 15000,
+  });
+
+  const html = res.data;
+  const match = html.match(/<script id="__NEXT_DATA__" type="application\/json">([\s\S]*?)<\/script>/);
+  if (!match) {
+    console.log('[embed] no __NEXT_DATA__ found; HTML snippet:', html.slice(0, 300));
+    return null;
+  }
+
+  const nextData = JSON.parse(match[1]);
+  console.log('[embed] __NEXT_DATA__ keys:', Object.keys(nextData));
+  const pageProps = nextData?.props?.pageProps;
+  console.log('[embed] pageProps keys:', Object.keys(pageProps || {}));
+
+  // Spotify embed structure: pageProps.state.data.entity or similar
+  const state = pageProps?.state;
+  console.log('[embed] state keys:', Object.keys(state || {}));
+  const entity = state?.data?.entity ?? pageProps?.entity ?? pageProps?.data;
+  console.log('[embed] entity type:', entity?.type, 'name:', entity?.name, 'trackCount:', entity?.trackCount ?? entity?.tracks?.items?.length);
+
+  if (!entity) {
+    console.log('[embed] full pageProps sample:', JSON.stringify(pageProps).slice(0, 500));
+    return null;
+  }
+
+  const tracks = [];
+  const items = entity?.tracks?.items ?? entity?.items ?? [];
+  for (const item of items) {
+    const t = item?.track ?? item;
+    if (!t?.id) continue;
+    if (t.type && t.type !== 'track') continue;
+    tracks.push({
+      spotifyId:   t.id,
+      title:       t.name,
+      artist:      (t.artists || []).map(a => a.name).join(', '),
+      album:       t.album?.name ?? '',
+      albumArtUrl: t.album?.images?.[0]?.url ?? null,
+      previewUrl:  t.preview_url ?? null,
+    });
+  }
+
+  return {
+    name:        entity.name || 'Imported Playlist',
+    description: entity.description || null,
+    coverUrl:    entity.images?.[0]?.url ?? entity.coverArt?.sources?.[0]?.url ?? null,
+    tracks,
+  };
+}
+
 // Fetch playlist metadata + all tracks (paginates automatically)
 // Returns { name, description, coverUrl, tracks }
 async function getPlaylistTracks(playlistId, accessToken) {
   const tracks = [];
 
-  // Step 1: fetch playlist metadata + first 100 tracks via fields param.
-  // This avoids the /tracks sub-endpoint which requires extended app permissions.
-  const TRACK_FIELDS = 'name,description,images,tracks(items(track(id,name,type,artists(name),album(name,images(url)),preview_url)),total,next)';
   const playlistRes = await axios.get(`${API_BASE}/playlists/${playlistId}`, {
     headers: { Authorization: `Bearer ${accessToken}` },
-    params: { fields: TRACK_FIELDS },
   });
 
   const data = playlistRes.data;
-  console.log('[getPlaylistTracks] response top-level keys:', Object.keys(data));
-  console.log('[getPlaylistTracks] tracks keys:', Object.keys(data.tracks || {}));
-  console.log('[getPlaylistTracks] tracks.total:', data.tracks?.total, 'items:', data.tracks?.items?.length);
   const meta = {
     name:        data.name || 'Imported Playlist',
     description: data.description || null,
@@ -184,25 +235,20 @@ async function getPlaylistTracks(playlistId, accessToken) {
   const total = data.tracks?.total ?? 0;
   console.log(`[getPlaylistTracks] "${data.name}" total=${total} embedded=${tracks.length}`);
 
-  // Paginate if there are more tracks (next points to /tracks sub-endpoint)
-  let nextUrl = tracks.length < total ? data.tracks?.next : null;
+  let nextUrl = (data.tracks == null || tracks.length < total)
+    ? `${API_BASE}/playlists/${playlistId}/tracks?limit=100`
+    : data.tracks?.next;
 
   while (nextUrl) {
-    console.log(`[getPlaylistTracks] GET ${nextUrl.slice(0, 100)}`);
-    try {
-      const res = await axios.get(nextUrl, { headers: { Authorization: `Bearer ${accessToken}` } });
-      const before = tracks.length;
-      extractItems(res.data.items);
-      console.log(`[getPlaylistTracks] paginated +${tracks.length - before} (total so far: ${tracks.length})`);
-      nextUrl = res.data.next;
-    } catch (err) {
-      console.error(`[getPlaylistTracks] tracks fetch error ${err.response?.status}:`, JSON.stringify(err.response?.data));
-      throw err;
-    }
+    const res = await axios.get(nextUrl, { headers: { Authorization: `Bearer ${accessToken}` } });
+    const before = tracks.length;
+    extractItems(res.data.items);
+    console.log(`[getPlaylistTracks] paginated +${tracks.length - before}`);
+    nextUrl = res.data.next;
   }
 
   console.log(`[getPlaylistTracks] done, extracted ${tracks.length} tracks`);
   return { ...meta, tracks };
 }
 
-module.exports = { getAuthUrl, exchangeCode, refreshAccessToken, getSpotifyProfile, getLikedTracks, getClientCredentialsToken, getPlaylistTracks };
+module.exports = { getAuthUrl, exchangeCode, refreshAccessToken, getSpotifyProfile, getLikedTracks, getClientCredentialsToken, getPlaylistTracks, getPlaylistTracksFromEmbed };

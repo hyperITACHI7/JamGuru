@@ -223,18 +223,43 @@ router.post('/import-playlist', authMiddleware, async (req, res) => {
     let playlistMeta;
     let tracks;
 
-    // Try user token first, then fall back to client credentials
+    // Try user token first, then client credentials, then embed page fallback
+    let apiError = null;
     if (user?.spotifyAccessToken) {
       try {
         ({ tracks, ...playlistMeta } = await fetchTracks(user.spotifyAccessToken, true));
       } catch (err) {
+        apiError = err;
         console.error('[import-playlist] User token failed, trying client credentials:', err.response?.status);
-        const ccToken = await spotifyAuth.getClientCredentialsToken();
-        ({ tracks, ...playlistMeta } = await fetchTracks(ccToken, false));
+        try {
+          const ccToken = await spotifyAuth.getClientCredentialsToken();
+          ({ tracks, ...playlistMeta } = await fetchTracks(ccToken, false));
+          apiError = null;
+        } catch (ccErr) {
+          apiError = ccErr;
+        }
       }
     } else {
-      const ccToken = await spotifyAuth.getClientCredentialsToken();
-      ({ tracks, ...playlistMeta } = await fetchTracks(ccToken, false));
+      try {
+        const ccToken = await spotifyAuth.getClientCredentialsToken();
+        ({ tracks, ...playlistMeta } = await fetchTracks(ccToken, false));
+      } catch (err) {
+        apiError = err;
+      }
+    }
+
+    // If both API paths failed (likely 403 due to Spotify app restrictions),
+    // fall back to parsing the public embed page
+    if (apiError || tracks.length === 0) {
+      console.log('[import-playlist] API unavailable, trying embed page fallback...');
+      const embedResult = await spotifyAuth.getPlaylistTracksFromEmbed(playlistId);
+      if (embedResult && embedResult.tracks.length > 0) {
+        tracks = embedResult.tracks;
+        playlistMeta = { name: embedResult.name, description: embedResult.description, coverUrl: embedResult.coverUrl };
+        console.log(`[import-playlist] embed fallback got ${tracks.length} tracks from "${embedResult.name}"`);
+      } else if (apiError) {
+        throw apiError;
+      }
     }
 
     if (tracks.length === 0) {
