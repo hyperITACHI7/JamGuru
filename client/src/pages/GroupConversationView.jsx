@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
-import { ArrowLeft, Play, Pause, Heart, Music, Users } from 'lucide-react'
+import { ArrowLeft, Play, Pause, Heart, Music, Users, ChevronRight } from 'lucide-react'
 import { getGroupFeed, likeGroupRec, unlikeGroupRec } from '../phase5/api/groups'
 import { usePlayer } from '../context/PlayerContext'
+import GroupMembersSheet from '../components/GroupMembersSheet'
 
 function formatTime(iso) {
   const d    = new Date(iso)
@@ -80,9 +81,10 @@ function GroupMessage({ msg, groupId, onLikeToggle }) {
 }
 
 export default function GroupConversationView({ group, onBack }) {
-  const [messages, setMessages] = useState([])
-  const [loading, setLoading]   = useState(true)
-  const [liking, setLiking]     = useState(null)
+  const [messages, setMessages]       = useState([])
+  const [loading, setLoading]         = useState(true)
+  const [liking, setLiking]           = useState(null)
+  const [showMembers, setShowMembers] = useState(false)
   const bottomRef = useRef(null)
 
   useEffect(() => {
@@ -123,16 +125,26 @@ export default function GroupConversationView({ group, onBack }) {
         <button onClick={onBack} className="text-[#B3B3B3] hover:text-white transition-colors p-1 -ml-1">
           <ArrowLeft size={18} />
         </button>
-        <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-purple-500 to-violet-700 flex items-center justify-center flex-shrink-0">
-          <Users size={15} className="text-white" />
-        </div>
-        <div>
-          <p className="text-white font-semibold text-sm leading-tight">{group.name}</p>
-          <p className="text-[#B3B3B3] text-xs">
-            {group.memberCount ?? group._count?.members ?? 0} members
-          </p>
-        </div>
+        <button
+          onClick={() => setShowMembers(true)}
+          className="flex items-center gap-3 flex-1 min-w-0 text-left hover:opacity-80 transition-opacity"
+        >
+          <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-purple-500 to-violet-700 flex items-center justify-center flex-shrink-0">
+            <Users size={15} className="text-white" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-white font-semibold text-sm leading-tight">{group.name}</p>
+            <p className="text-[#B3B3B3] text-xs">
+              {group.memberCount ?? group._count?.members ?? 0} members · tap to see
+            </p>
+          </div>
+          <ChevronRight size={14} className="text-[#535353] flex-shrink-0 ml-auto" />
+        </button>
       </div>
+
+      {showMembers && (
+        <GroupMembersSheet group={group} onClose={() => setShowMembers(false)} />
+      )}
 
       {/* Feed */}
       <div className="flex-1 overflow-y-auto py-4">

@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { Crown, Sparkles, RefreshCw } from 'lucide-react'
+import { Crown, Sparkles, RefreshCw, UserPlus, UserCheck } from 'lucide-react'
 import TopBar from '../components/layout/TopBar'
 import { getMe } from '../api/auth'
 import { getProfile, updateProfile } from '../api/users'
 import { getTaste, getTasteByUser, updateTaste, refreshTaste } from '../api/taste'
+import { sendFriendRequest } from '../phase3/api/friends'
 
 const GENRE_OPTIONS = [
   'hip-hop', 'r&b', 'pop', 'rock', 'indie', 'electronic',
@@ -85,6 +86,8 @@ export default function Profile() {
 
   const [user, setUser]               = useState(null)
   const [isOwnProfile, setIsOwnProfile] = useState(false)
+  const [friendStatus, setFriendStatus] = useState(null)
+  const [addingFriend, setAddingFriend] = useState(false)
   const [editing, setEditing]         = useState(false)
   const [form, setForm]               = useState({ displayName: '', bio: '' })
   const [loading, setLoading]         = useState(true)
@@ -120,6 +123,7 @@ export default function Profile() {
         setUser(profileData)
         const mine = meRes.status === 'fulfilled' && meRes.value.data.username === username
         setIsOwnProfile(mine)
+        if (!mine) setFriendStatus(profileData.friendshipStatus ?? null)
         if (mine) setForm({ displayName: profileData.displayName, bio: profileData.bio ?? '' })
         loadTaste(mine ? null : username)
       }
@@ -195,6 +199,18 @@ export default function Profile() {
     }
   }
 
+  async function handleAddFriend() {
+    setAddingFriend(true)
+    try {
+      await sendFriendRequest(user.id)
+      setFriendStatus('PENDING_SENT')
+    } catch (e) {
+      if (e.response?.data?.error === 'Already friends') setFriendStatus('ACCEPTED')
+    } finally {
+      setAddingFriend(false)
+    }
+  }
+
   function handleLogout() {
     localStorage.removeItem('token')
     localStorage.removeItem('user')
@@ -256,8 +272,8 @@ export default function Profile() {
 
         <div className="px-6 py-4 space-y-6">
           {/* Action buttons */}
-          <div className="flex items-center gap-4 flex-wrap">
-            {isOwnProfile && (
+          <div className="flex items-center gap-3 flex-wrap">
+            {isOwnProfile ? (
               <>
                 <button
                   onClick={() => { setEditing(v => !v); setEditingTaste(false) }}
@@ -278,6 +294,25 @@ export default function Profile() {
                   Log out
                 </button>
               </>
+            ) : (
+              /* Add Friend button for other users' profiles */
+              friendStatus === 'ACCEPTED' ? (
+                <div className="flex items-center gap-2 border border-[#1DB954]/40 text-[#1DB954] text-sm font-semibold px-5 py-1.5 rounded-full">
+                  <UserCheck size={15} /> Friends
+                </div>
+              ) : (
+                <button
+                  onClick={handleAddFriend}
+                  disabled={addingFriend || friendStatus === 'PENDING_SENT'}
+                  className="flex items-center gap-2 bg-[#1DB954] hover:bg-[#1ed760] text-black text-sm font-bold px-5 py-1.5 rounded-full transition-colors disabled:opacity-60"
+                >
+                  {friendStatus === 'PENDING_SENT' ? (
+                    <><UserCheck size={15} /> Requested</>
+                  ) : (
+                    <><UserPlus size={15} /> {addingFriend ? 'Adding…' : 'Add Friend'}</>
+                  )}
+                </button>
+              )
             )}
           </div>
 

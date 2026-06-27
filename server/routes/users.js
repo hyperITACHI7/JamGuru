@@ -1,4 +1,5 @@
 const express = require('express');
+const jwt = require('jsonwebtoken');
 const { PrismaClient } = require('@prisma/client');
 const authMiddleware = require('../middleware/auth');
 const { thisMonthStart } = require('../services/phase4/scoring');
@@ -41,8 +42,18 @@ router.patch('/me', authMiddleware, async (req, res) => {
   }
 });
 
-// GET /api/users/:username — public profile
+// GET /api/users/:username — public profile; enriched when caller is authenticated
 router.get('/:username', async (req, res) => {
+  // Optional caller identification — don't fail if unauthenticated
+  let callerId = null;
+  const authHeader = req.headers.authorization;
+  if (authHeader?.startsWith('Bearer ')) {
+    try {
+      const decoded = jwt.verify(authHeader.split(' ')[1], process.env.JWT_SECRET);
+      callerId = decoded.userId;
+    } catch {}
+  }
+
   try {
     const user = await prisma.user.findUnique({
       where: { username: req.params.username },
@@ -50,13 +61,29 @@ router.get('/:username', async (req, res) => {
     });
     if (!user) return res.status(404).json({ error: 'User not found' });
 
-    // Compute real JamGuru-for count: how many users is this person the #1 trusted friend of?
     const month = thisMonthStart();
+
+    // Friend count
+    const friendCount = await prisma.friendship.count({
+      where: {
+        status: 'ACCEPTED',
+        OR: [{ requesterId: user.id }, { addresseeId: user.id }],
+      },
+    });
+
+    // Their JamGuru: the friend they trust most this month
+    const topTrust = await prisma.personalTrustRanking.findFirst({
+      where: { ownerId: user.id, month, trustScore: { gt: 0 } },
+      orderBy: { trustScore: 'desc' },
+      include: { friend: { select: { id: true, username: true, displayName: true } } },
+    });
+    const myJamGuru = topTrust?.friend ?? null;
+
+    // How many listeners this person is JamGuru for
     const candidateOwners = await prisma.personalTrustRanking.findMany({
       where: { friendId: user.id, month, trustScore: { gt: 0 } },
       select: { ownerId: true },
     });
-
     let jamGuruForCount = 0;
     await Promise.all(
       candidateOwners.map(async ({ ownerId }) => {
@@ -68,7 +95,29 @@ router.get('/:username', async (req, res) => {
       })
     );
 
-    res.json({ ...user, jamGuruForCount });
+    // Friendship status — only when caller is authenticated and not their own profile
+    let friendshipStatus = null;
+    if (callerId && callerId !== user.id) {
+      const friendship = await prisma.friendship.findFirst({
+        where: {
+          OR: [
+            { requesterId: callerId, addresseeId: user.id },
+            { requesterId: user.id, addresseeId: callerId },
+          ],
+        },
+      });
+      if (friendship) {
+        if (friendship.status === 'ACCEPTED') {
+          friendshipStatus = 'ACCEPTED';
+        } else if (friendship.requesterId === callerId) {
+          friendshipStatus = 'PENDING_SENT';
+        } else {
+          friendshipStatus = 'PENDING_RECEIVED';
+        }
+      }
+    }
+
+    res.json({ ...user, jamGuruForCount, friendCount, myJamGuru, friendshipStatus });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });

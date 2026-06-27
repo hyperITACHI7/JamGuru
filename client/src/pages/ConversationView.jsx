@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
-import { ArrowLeft, Play, Pause, Heart, Music, MessageCircle, Sparkles, Send, X } from 'lucide-react'
+import { ArrowLeft, Play, Pause, Heart, Music, MessageCircle, Sparkles, Send, X, ChevronRight } from 'lucide-react'
+import FriendProfileSheet from '../components/FriendProfileSheet'
 import { getConversation, sendRecommendation } from '../phase3/api/recommendations'
 import { likeRecommendation, unlikeRecommendation } from '../phase4/api/likes'
 import FeedbackTags from '../phase4/components/FeedbackTags'
@@ -196,6 +197,7 @@ export default function ConversationView({ friend, onBack }) {
   }
 
   const initial = friend.displayName?.[0]?.toUpperCase() ?? '?'
+  const [showProfile, setShowProfile] = useState(false)
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -204,14 +206,24 @@ export default function ConversationView({ friend, onBack }) {
         <button onClick={onBack} className="text-[#B3B3B3] hover:text-white transition-colors p-1 -ml-1">
           <ArrowLeft size={18} />
         </button>
-        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#1DB954] to-emerald-700 flex items-center justify-center text-black font-bold text-sm flex-shrink-0">
-          {initial}
-        </div>
-        <div>
-          <p className="text-white font-semibold text-sm leading-tight">{friend.displayName}</p>
-          <p className="text-[#B3B3B3] text-xs">@{friend.username}</p>
-        </div>
+        <button
+          onClick={() => setShowProfile(true)}
+          className="flex items-center gap-3 flex-1 min-w-0 text-left hover:opacity-80 transition-opacity"
+        >
+          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#1DB954] to-emerald-700 flex items-center justify-center text-black font-bold text-sm flex-shrink-0">
+            {initial}
+          </div>
+          <div className="min-w-0">
+            <p className="text-white font-semibold text-sm leading-tight">{friend.displayName}</p>
+            <p className="text-[#B3B3B3] text-xs">@{friend.username}</p>
+          </div>
+          <ChevronRight size={14} className="text-[#535353] flex-shrink-0 ml-auto" />
+        </button>
       </div>
+
+      {showProfile && (
+        <FriendProfileSheet friend={friend} onClose={() => setShowProfile(false)} />
+      )}
 
       {/* AI suggest compose bar */}
       <div className="flex-shrink-0 border-t border-white/5 bg-[#181818] px-4 py-3">
