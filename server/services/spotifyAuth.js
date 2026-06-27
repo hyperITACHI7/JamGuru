@@ -182,10 +182,12 @@ async function getPlaylistTracks(playlistId, accessToken) {
   // Step 2: try embedded tracks first (fast path)
   extractItems(data.tracks?.items);
   const total = data.tracks?.total ?? 0;
-  console.log(`[getPlaylistTracks] "${data.name}" total=${total} embedded=${tracks.length}`);
+  console.log(`[getPlaylistTracks] "${data.name}" total=${total} embedded=${tracks.length} hasTracks=${data.tracks != null}`);
 
-  // Step 3: if embedded items are missing but total > 0, fetch via /tracks endpoint
-  let nextUrl = tracks.length < total
+  // Step 3: fetch via /tracks endpoint when:
+  //   - tracks field is absent from the response (data.tracks == null)
+  //   - or embedded items are fewer than total (pagination needed)
+  let nextUrl = (data.tracks == null || tracks.length < total)
     ? `${API_BASE}/playlists/${playlistId}/tracks?limit=100`
     : data.tracks?.next;
 
