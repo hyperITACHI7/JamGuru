@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Search as SearchIcon, X, Play, Pause, Music, Share2 } from 'lucide-react'
+import { Search as SearchIcon, Play, Pause, Music, Share2 } from 'lucide-react'
 import TopBar from '../components/layout/TopBar'
 import { searchSongs } from '../api/songs'
 import SharePanel from '../phase5/components/SharePanel'
@@ -25,7 +25,7 @@ const CATEGORIES = [
 
 // ── Track row ─────────────────────────────────────────────────────────────────
 
-function TrackRow({ track, index, onSelect }) {
+function TrackRow({ track, index, onSelect, onShare }) {
   const player    = usePlayer()
   const isActive  = player.isActive(track)
   const isPlaying = isActive && player.playing
@@ -35,21 +35,15 @@ function TrackRow({ track, index, onSelect }) {
       onClick={() => onSelect(track)}
       className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-[#1A1A1A] transition-colors group cursor-pointer"
     >
-      {/* Index / play toggle — stops propagation so click doesn't also open panel */}
-      <div className="w-5 flex-shrink-0 text-center" onClick={e => e.stopPropagation()}>
-        <span className={`text-sm text-[#B3B3B3] group-hover:hidden ${isPlaying ? 'hidden' : ''}`}>
-          {index + 1}
-        </span>
-        <button
-          onClick={(e) => { e.stopPropagation(); player.toggle(track) }}
-          className={`hidden group-hover:block text-white ${isPlaying ? '!block' : ''}`}
-          title={track.previewUrl ? (isPlaying ? 'Pause' : 'Play preview') : 'No preview available'}
-        >
-          {isPlaying
-            ? <Pause size={14} className="text-[#1DB954]" fill="currentColor" />
-            : <Play size={14} fill="currentColor" className={track.previewUrl ? '' : 'text-[#535353]'} />
-          }
-        </button>
+      {/* Index / play indicator */}
+      <div className="w-5 flex-shrink-0 text-center">
+        {isPlaying
+          ? <Pause size={14} className="text-[#1DB954]" fill="currentColor" />
+          : <span className={`text-sm text-[#B3B3B3] group-hover:hidden ${isActive ? 'hidden' : ''}`}>{index + 1}</span>
+        }
+        {!isPlaying && (
+          <Play size={14} fill="currentColor" className={`hidden group-hover:block ${isActive ? '!block text-[#1DB954]' : 'text-white'}`} />
+        )}
       </div>
 
       {/* Album art */}
@@ -64,7 +58,7 @@ function TrackRow({ track, index, onSelect }) {
 
       {/* Title + artist */}
       <div className="flex-1 min-w-0">
-        <p className={`text-sm font-medium truncate ${isPlaying ? 'text-[#1DB954]' : 'text-white'}`}>
+        <p className={`text-sm font-medium truncate ${isActive ? 'text-[#1DB954]' : 'text-white'}`}>
           {track.title}
         </p>
         <p className="text-[#B3B3B3] text-xs truncate">{track.artist}</p>
@@ -73,71 +67,18 @@ function TrackRow({ track, index, onSelect }) {
       {/* Album */}
       <p className="text-[#B3B3B3] text-xs truncate hidden md:block max-w-[180px]">{track.album}</p>
 
-      {/* Preview badge */}
-      {track.previewUrl && (
-        <span className="text-[#1DB954] text-[10px] font-semibold hidden group-hover:block flex-shrink-0">
-          PREVIEW
-        </span>
-      )}
-
       {/* Share icon */}
-      <Share2 size={15} className="flex-shrink-0 text-[#B3B3B3] opacity-0 group-hover:opacity-100 transition-opacity" />
+      <button
+        onClick={e => { e.stopPropagation(); onShare(track) }}
+        className="flex-shrink-0 text-[#B3B3B3] hover:text-white opacity-0 group-hover:opacity-100 transition-opacity p-1"
+      >
+        <Share2 size={15} />
+      </button>
     </div>
   )
 }
 
 // ── Song panel ───────────────────────────────────────────────────────────────
-
-function SongPanel({ song, onShare, onClose }) {
-  const player    = usePlayer()
-  const isActive  = player.isActive(song)
-  const isPlaying = isActive && player.playing
-
-  return (
-    <div className="border-t border-[#2a2a2a] bg-[#181818] px-6 py-4 flex items-center gap-4 flex-shrink-0">
-      {/* Art */}
-      <div className="w-14 h-14 flex-shrink-0 rounded shadow-lg overflow-hidden bg-[#282828]">
-        {song.albumArtUrl
-          ? <img src={song.albumArtUrl} alt={song.album} className="w-full h-full object-cover" />
-          : <div className="w-full h-full flex items-center justify-center"><Music size={20} className="text-[#B3B3B3]" /></div>
-        }
-      </div>
-
-      {/* Info */}
-      <div className="flex-1 min-w-0">
-        <p className="text-white font-semibold text-sm truncate">{song.title}</p>
-        <p className="text-[#B3B3B3] text-xs truncate">{song.artist} · {song.album}</p>
-      </div>
-
-      {/* Actions */}
-      <div className="flex items-center gap-3 flex-shrink-0">
-        {song.previewUrl ? (
-          <button
-            onClick={() => player.toggle(song)}
-            className="flex items-center gap-2 bg-[#282828] hover:bg-[#3e3e3e] text-white text-xs font-semibold px-3 py-2 rounded-full transition-colors"
-          >
-            {isPlaying ? <Pause size={13} fill="currentColor" /> : <Play size={13} fill="currentColor" />}
-            {isPlaying ? 'Pause' : 'Preview'}
-          </button>
-        ) : (
-          <span className="text-[#535353] text-xs">No preview</span>
-        )}
-
-        <button
-          onClick={onShare}
-          className="flex items-center gap-2 bg-[#1DB954] hover:bg-[#1ed760] text-black text-xs font-bold px-4 py-2 rounded-full transition-colors"
-        >
-          <Share2 size={13} />
-          Share
-        </button>
-
-        <button onClick={onClose} className="text-[#B3B3B3] hover:text-white p-1 transition-colors">
-          <X size={18} />
-        </button>
-      </div>
-    </div>
-  )
-}
 
 // ── Main Search page ──────────────────────────────────────────────────────────
 
@@ -164,7 +105,6 @@ export default function Search() {
   const [results, setResults]       = useState([])
   const [loading, setLoading]       = useState(false)
   const [error, setError]           = useState(null)
-  const [selectedSong, setSelectedSong]     = useState(null)
   const [sharePanelSong, setSharePanelSong] = useState(null)
   const [preferredCats, setPreferredCats]   = useState(new Set())
   const inputRef = useRef(null)
@@ -226,7 +166,7 @@ export default function Search() {
   const showEmpty   = !loading && !error && query.trim().length >= 2 && results.length === 0
 
   function handleTrackSelect(track) {
-    setSelectedSong(track)
+    player.toggle(track)
   }
 
   return (
@@ -339,21 +279,13 @@ export default function Search() {
                   track={track}
                   index={i}
                   onSelect={handleTrackSelect}
+                  onShare={setSharePanelSong}
                 />
               ))}
             </div>
           </div>
         )}
       </div>
-
-      {/* Song panel */}
-      {selectedSong && (
-        <SongPanel
-          song={selectedSong}
-          onShare={() => setSharePanelSong(selectedSong)}
-          onClose={() => setSelectedSong(null)}
-        />
-      )}
 
       {/* Share modal */}
       {sharePanelSong && (
