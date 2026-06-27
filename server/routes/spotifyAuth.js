@@ -188,18 +188,32 @@ router.post('/import-playlist', authMiddleware, async (req, res) => {
   } catch (e) { console.log('[import-playlist] could not decode token:', e.message); }
 
   try {
-    const user = await prisma.user.findUnique({ where: { id: req.userId } });
+    let user = await prisma.user.findUnique({ where: { id: req.userId } });
 
-    // Helper: try fetching tracks with a given token, refresh user token on 401
+    // Proactively refresh the Spotify token — it expires after 1 hour
+    if (user?.spotifyRefreshToken) {
+      try {
+        const freshToken = await spotifyAuth.refreshAccessToken(user.spotifyRefreshToken);
+        await prisma.user.update({ where: { id: req.userId }, data: { spotifyAccessToken: freshToken } });
+        user = { ...user, spotifyAccessToken: freshToken };
+        console.log('[import-playlist] token refreshed successfully');
+      } catch (e) {
+        console.log('[import-playlist] token refresh failed, using stored token:', e.message);
+      }
+    }
+
+    // Helper: try fetching tracks; on 401 or 403 attempt a token refresh
     async function fetchTracks(token, isUserToken) {
       try {
         return await spotifyAuth.getPlaylistTracks(playlistId, token);
       } catch (err) {
         const status = err.response?.status;
         console.error(`[import-playlist] Spotify ${status} (${isUserToken ? 'user token' : 'client creds'}):`, err.response?.data || err.message);
-        if (status === 401 && isUserToken && user?.spotifyRefreshToken) {
+        if ((status === 401 || status === 403) && isUserToken && user?.spotifyRefreshToken) {
+          console.log('[import-playlist] retrying after token refresh...');
           const newToken = await spotifyAuth.refreshAccessToken(user.spotifyRefreshToken);
           await prisma.user.update({ where: { id: req.userId }, data: { spotifyAccessToken: newToken } });
+          user = { ...user, spotifyAccessToken: newToken };
           return spotifyAuth.getPlaylistTracks(playlistId, newToken);
         }
         throw err;

@@ -192,11 +192,17 @@ async function getPlaylistTracks(playlistId, accessToken) {
     : data.tracks?.next;
 
   while (nextUrl) {
-    const res = await axios.get(nextUrl, { headers: { Authorization: `Bearer ${accessToken}` } });
-    const before = tracks.length;
-    extractItems(res.data.items);
-    console.log(`[getPlaylistTracks] paginated +${tracks.length - before} (total so far: ${tracks.length})`);
-    nextUrl = res.data.next;
+    console.log(`[getPlaylistTracks] GET ${nextUrl.slice(0, 100)}`);
+    try {
+      const res = await axios.get(nextUrl, { headers: { Authorization: `Bearer ${accessToken}` } });
+      const before = tracks.length;
+      extractItems(res.data.items);
+      console.log(`[getPlaylistTracks] paginated +${tracks.length - before} (total so far: ${tracks.length})`);
+      nextUrl = res.data.next;
+    } catch (err) {
+      console.error(`[getPlaylistTracks] tracks fetch error ${err.response?.status}:`, JSON.stringify(err.response?.data));
+      throw err;
+    }
   }
 
   console.log(`[getPlaylistTracks] done, extracted ${tracks.length} tracks`);
