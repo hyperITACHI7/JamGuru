@@ -393,7 +393,7 @@ export default function ConversationView({ friend, onBack }) {
       setReplySearchLoading(true)
       try {
         const { data } = await searchSongs(q)
-        setReplySearchResults(data.songs || [])
+        setReplySearchResults(data.tracks || [])
       } catch (_) {}
       setReplySearchLoading(false)
     }, 400)
