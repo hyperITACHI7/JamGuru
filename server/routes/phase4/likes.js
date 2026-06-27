@@ -2,6 +2,7 @@ const express = require('express');
 const { PrismaClient } = require('@prisma/client');
 const auth = require('../../middleware/auth');
 const { recomputeScores, FEEDBACK_TAGS } = require('../../services/phase4/scoring');
+const { refreshTasteProfile } = require('../../services/tasteProfile');
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -32,6 +33,7 @@ router.post('/recommendations/:id/like', auth, async (req, res) => {
     });
 
     await recomputeScores(prisma, { recommendationId: req.params.id, likerId: req.userId });
+    refreshTasteProfile(prisma, req.userId).catch(() => {});
 
     const likeCount = await prisma.like.count({ where: { recommendationId: req.params.id } });
     res.json({ liked: true, likeCount, likeId: like.id });
@@ -118,6 +120,7 @@ router.post('/songs/:id/like', auth, async (req, res) => {
       create: { userId: req.userId, spotifyId: req.params.id },
       update: {},
     });
+    refreshTasteProfile(prisma, req.userId).catch(() => {});
     res.json({ liked: true });
   } catch (e) {
     console.error(e);
