@@ -42,14 +42,14 @@ export default function Library() {
           {/* Import playlist card — same style as Liked Songs */}
           <Link
             to="/import-playlist"
-            className="flex items-center gap-4 p-3 rounded-lg hover:bg-[#ffffff0d] transition-colors"
+            className="flex items-center gap-4 p-3 rounded-lg opacity-40 pointer-events-none"
           >
-            <div className="w-16 h-16 flex-shrink-0 rounded-md bg-[#282828] flex items-center justify-center shadow-lg">
-              <Music size={28} className="text-[#B3B3B3]" />
+            <div className="w-16 h-16 flex-shrink-0 rounded-md bg-red-800 flex items-center justify-center shadow-lg">
+              <Music size={28} className="text-white" />
             </div>
             <div className="overflow-hidden">
-              <p className="text-white font-semibold text-base truncate">Import from Spotify</p>
-              <p className="text-[#B3B3B3] text-sm mt-0.5">Paste a playlist link</p>
+              <p className="text-red-400 font-semibold text-base truncate">DISABLED TEST</p>
+              <p className="text-[#B3B3B3] text-sm mt-0.5">If you see this, new code is live</p>
             </div>
           </Link>
         </section>
