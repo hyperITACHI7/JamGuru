@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import {
   ArrowLeft, Play, Pause, Heart, Music, MessageCircle, Sparkles, Send, X,
-  ChevronRight, ThumbsDown, Plus, Search, ChevronLeft, ListMusic, HelpCircle, Reply,
+  ChevronRight, ThumbsDown, Plus, Search, ChevronLeft, ListMusic, Reply,
 } from 'lucide-react'
 import FriendProfileSheet from '../components/FriendProfileSheet'
 import { getConversation, sendRecommendation } from '../phase3/api/recommendations'
@@ -899,18 +899,18 @@ export default function ConversationView({ friend, onBack }) {
           </div>
         ) : (
           <div className="flex items-center gap-2">
-            <p className="text-[#535353] text-xs flex-1 truncate">Share a song with {friend.displayName}</p>
+            <button onClick={openRequestComposer}
+              className={`text-xs font-semibold flex-shrink-0 transition-colors ${
+                showRequest ? 'text-[#1DB954]' : 'text-[#535353] hover:text-[#B3B3B3]'
+              }`}>
+              Request a Song
+            </button>
+            <div className="flex-1" />
             <button onClick={openLibrary} title="Pick from your library"
               className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 transition-colors ${
                 showLibrary ? 'bg-[#1DB954] text-black' : 'bg-[#282828] text-[#B3B3B3] hover:text-white hover:bg-[#3e3e3e]'
               }`}>
               <Plus size={15} />
-            </button>
-            <button onClick={openRequestComposer} title="Request a song"
-              className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 transition-colors ${
-                showRequest ? 'bg-[#1DB954] text-black' : 'bg-[#282828] text-[#B3B3B3] hover:text-white hover:bg-[#3e3e3e]'
-              }`}>
-              <HelpCircle size={15} />
             </button>
             <button onClick={handleAiSuggest} disabled={suggesting}
               className="flex items-center gap-1.5 text-xs font-semibold text-[#1DB954] hover:text-[#1ed760] transition-colors disabled:opacity-50 flex-shrink-0">
