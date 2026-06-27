@@ -154,27 +154,11 @@ async function getPlaylistTracksFromEmbed(playlistId) {
 
   const html = res.data;
   const match = html.match(/<script id="__NEXT_DATA__" type="application\/json">([\s\S]*?)<\/script>/);
-  if (!match) {
-    console.log('[embed] no __NEXT_DATA__ found; HTML snippet:', html.slice(0, 300));
-    return null;
-  }
+  if (!match) return null;
 
   const nextData = JSON.parse(match[1]);
-  console.log('[embed] __NEXT_DATA__ keys:', Object.keys(nextData));
-  const pageProps = nextData?.props?.pageProps;
-  console.log('[embed] pageProps keys:', Object.keys(pageProps || {}));
-
-  // Spotify embed structure: pageProps.state.data.entity or similar
-  const entity = pageProps?.state?.data?.entity;
-  if (!entity) {
-    console.log('[embed] entity not found in __NEXT_DATA__');
-    return null;
-  }
-
-  console.log(`[embed] found entity "${entity.name}" with ${entity.trackList?.length ?? 0} trackList entries`);
-  if (entity.trackList?.length > 0) {
-    console.log('[embed] first trackList item sample:', JSON.stringify(entity.trackList[0]).slice(0, 300));
-  }
+  const entity = nextData?.props?.pageProps?.state?.data?.entity;
+  if (!entity) return null;
 
   const tracks = [];
   for (const item of (entity.trackList || [])) {
@@ -232,7 +216,6 @@ async function getPlaylistTracks(playlistId, accessToken) {
 
   extractItems(data.tracks?.items);
   const total = data.tracks?.total ?? 0;
-  console.log(`[getPlaylistTracks] "${data.name}" total=${total} embedded=${tracks.length}`);
 
   let nextUrl = (data.tracks == null || tracks.length < total)
     ? `${API_BASE}/playlists/${playlistId}/tracks?limit=100`
@@ -240,13 +223,10 @@ async function getPlaylistTracks(playlistId, accessToken) {
 
   while (nextUrl) {
     const res = await axios.get(nextUrl, { headers: { Authorization: `Bearer ${accessToken}` } });
-    const before = tracks.length;
     extractItems(res.data.items);
-    console.log(`[getPlaylistTracks] paginated +${tracks.length - before}`);
     nextUrl = res.data.next;
   }
 
-  console.log(`[getPlaylistTracks] done, extracted ${tracks.length} tracks`);
   return { ...meta, tracks };
 }
 

@@ -172,45 +172,25 @@ router.post('/import-playlist', authMiddleware, async (req, res) => {
   const match = playlistUrl.match(/playlist[:/]([A-Za-z0-9]+)/);
   if (!match) return res.status(400).json({ error: 'Could not parse playlist ID from URL' });
   const playlistId = match[1];
-  console.log(`[import-playlist] extracted playlistId="${playlistId}" from "${playlistUrl}"`);
-
-  // Log what scopes the stored user token actually has
-  try {
-    const user = await prisma.user.findUnique({ where: { id: req.userId }, select: { spotifyAccessToken: true } });
-    if (user?.spotifyAccessToken) {
-      const parts = user.spotifyAccessToken.split('.');
-      if (parts.length === 3) {
-        const payload = JSON.parse(Buffer.from(parts[1] + '==', 'base64').toString());
-        console.log('[import-playlist] token scopes:', payload.scope || payload.scp || 'not found in token');
-        console.log('[import-playlist] token exp:', payload.exp ? new Date(payload.exp * 1000).toISOString() : 'unknown');
-      }
-    }
-  } catch (e) { console.log('[import-playlist] could not decode token:', e.message); }
-
   try {
     let user = await prisma.user.findUnique({ where: { id: req.userId } });
 
-    // Proactively refresh the Spotify token — it expires after 1 hour
+    // Proactively refresh the Spotify token before making API calls
     if (user?.spotifyRefreshToken) {
       try {
         const freshToken = await spotifyAuth.refreshAccessToken(user.spotifyRefreshToken);
         await prisma.user.update({ where: { id: req.userId }, data: { spotifyAccessToken: freshToken } });
         user = { ...user, spotifyAccessToken: freshToken };
-        console.log('[import-playlist] token refreshed successfully');
-      } catch (e) {
-        console.log('[import-playlist] token refresh failed, using stored token:', e.message);
-      }
+      } catch (e) { /* continue with existing token */ }
     }
 
-    // Helper: try fetching tracks; on 401 or 403 attempt a token refresh
+    // Helper: try fetching tracks; on 401/403 attempt one token refresh
     async function fetchTracks(token, isUserToken) {
       try {
         return await spotifyAuth.getPlaylistTracks(playlistId, token);
       } catch (err) {
         const status = err.response?.status;
-        console.error(`[import-playlist] Spotify ${status} (${isUserToken ? 'user token' : 'client creds'}):`, err.response?.data || err.message);
         if ((status === 401 || status === 403) && isUserToken && user?.spotifyRefreshToken) {
-          console.log('[import-playlist] retrying after token refresh...');
           const newToken = await spotifyAuth.refreshAccessToken(user.spotifyRefreshToken);
           await prisma.user.update({ where: { id: req.userId }, data: { spotifyAccessToken: newToken } });
           user = { ...user, spotifyAccessToken: newToken };
@@ -223,14 +203,13 @@ router.post('/import-playlist', authMiddleware, async (req, res) => {
     let playlistMeta;
     let tracks;
 
-    // Try user token first, then client credentials, then embed page fallback
+    // Try user token → client credentials → embed page fallback
     let apiError = null;
     if (user?.spotifyAccessToken) {
       try {
         ({ tracks, ...playlistMeta } = await fetchTracks(user.spotifyAccessToken, true));
       } catch (err) {
         apiError = err;
-        console.error('[import-playlist] User token failed, trying client credentials:', err.response?.status);
         try {
           const ccToken = await spotifyAuth.getClientCredentialsToken();
           ({ tracks, ...playlistMeta } = await fetchTracks(ccToken, false));
@@ -248,15 +227,11 @@ router.post('/import-playlist', authMiddleware, async (req, res) => {
       }
     }
 
-    // If both API paths failed (likely 403 due to Spotify app restrictions),
-    // fall back to parsing the public embed page
-    if (apiError || tracks.length === 0) {
-      console.log('[import-playlist] API unavailable, trying embed page fallback...');
+    if (apiError || !tracks?.length) {
       const embedResult = await spotifyAuth.getPlaylistTracksFromEmbed(playlistId);
       if (embedResult && embedResult.tracks.length > 0) {
         tracks = embedResult.tracks;
         playlistMeta = { name: embedResult.name, description: embedResult.description, coverUrl: embedResult.coverUrl };
-        console.log(`[import-playlist] embed fallback got ${tracks.length} tracks from "${embedResult.name}"`);
       } else if (apiError) {
         throw apiError;
       }
