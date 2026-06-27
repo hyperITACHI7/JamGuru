@@ -152,6 +152,11 @@ async function getPlaylistTracks(playlistId, accessToken) {
   });
 
   const data = playlistRes.data;
+  console.log('[getPlaylistTracks] tracks keys:', Object.keys(data.tracks || {}));
+  console.log('[getPlaylistTracks] tracks.total:', data.tracks?.total, 'items:', data.tracks?.items?.length, 'href:', data.tracks?.href?.slice(0, 80));
+  if (data.tracks?.items?.length > 0) {
+    console.log('[getPlaylistTracks] first item sample:', JSON.stringify(data.tracks.items[0]).slice(0, 300));
+  }
   const meta = {
     name:        data.name || 'Imported Playlist',
     description: data.description || null,
