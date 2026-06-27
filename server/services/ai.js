@@ -391,4 +391,65 @@ async function suggestForMe(prisma, userId) {
   return songs;
 }
 
-module.exports = { suggestSong, suggestForMe, getInteractionContext };
+async function rankSongsForRequest(prisma, userId, requestId) {
+  const songRequest = await prisma.songRequest.findUnique({ where: { id: requestId } });
+  if (!songRequest) throw new Error('Request not found');
+
+  // Fetch user's liked songs (deduped, most recent first)
+  const [directLikes, recLikes] = await Promise.all([
+    prisma.songLike.findMany({
+      where: { userId },
+      include: { song: true },
+      orderBy: { likedAt: 'desc' },
+      take: 60,
+    }),
+    prisma.like.findMany({
+      where: { likerId: userId },
+      include: { recommendation: { include: { song: true } } },
+      orderBy: { likedAt: 'desc' },
+      take: 60,
+    }),
+  ]);
+
+  const seen = new Set();
+  const songs = [];
+  for (const sl of directLikes) {
+    if (!seen.has(sl.spotifyId)) { seen.add(sl.spotifyId); songs.push(sl.song); }
+  }
+  for (const like of recLikes) {
+    const song = like.recommendation?.song;
+    if (song && !seen.has(song.spotifyId)) { seen.add(song.spotifyId); songs.push(song); }
+  }
+
+  if (songs.length === 0) return { picks: [], remaining: [] };
+
+  const pool = songs.slice(0, 50);
+  const songList = pool.map((s, i) => `${i + 1}. "${s.title}" by ${s.artist} [${s.spotifyId}]`).join('\n');
+
+  const prompt = `A friend sent this song request: "${songRequest.renderedText}"
+
+Pick the 5 best matching songs from this library list. Return ONLY a valid JSON array, no extra text:
+[{"spotifyId":"...","reason":"max 6 words"}]
+
+Available songs:
+${songList}`;
+
+  let picks = [];
+  try {
+    const raw = await callAI(prompt, 0.3);
+    const jsonMatch = raw.match(/\[[\s\S]*?\]/);
+    if (jsonMatch) picks = JSON.parse(jsonMatch[0]);
+  } catch (_) {
+    picks = [];
+  }
+
+  const pickedIds = new Set(picks.map(p => p.spotifyId));
+  const orderedPicks = picks
+    .map(p => { const s = pool.find(s => s.spotifyId === p.spotifyId); return s ? { ...s, aiReason: p.reason } : null; })
+    .filter(Boolean);
+  const remaining = songs.filter(s => !pickedIds.has(s.spotifyId));
+
+  return { picks: orderedPicks, remaining };
+}
+
+module.exports = { suggestSong, suggestForMe, getInteractionContext, rankSongsForRequest };

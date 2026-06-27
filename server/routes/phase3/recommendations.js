@@ -185,6 +185,7 @@ router.get('/conversation/:friendId', auth, async (req, res) => {
         direction: dir,
         song:      r.song,
         context:   r.context,
+        requestId: r.requestId ?? null,
         liked:     r.likes.length > 0,
         likeId:    r.likes[0]?.id ?? null,
         tags:      r.likes[0]?.feedbacks?.map(f => f.tag) ?? [],

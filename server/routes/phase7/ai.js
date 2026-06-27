@@ -1,7 +1,7 @@
 const express = require('express');
 const { PrismaClient } = require('@prisma/client');
 const auth = require('../../middleware/auth');
-const { suggestSong, suggestForMe, getInteractionContext } = require('../../services/ai');
+const { suggestSong, suggestForMe, getInteractionContext, rankSongsForRequest } = require('../../services/ai');
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -70,6 +70,28 @@ router.post('/ai/suggest/:friendId', auth, async (req, res) => {
   } catch (e) {
     console.error('[ai/suggest]', e.message);
     res.status(500).json({ error: e.message || 'AI suggestion failed' });
+  }
+});
+
+// POST /api/ai/rank-for-request — rank user's library songs against a request
+router.post('/ai/rank-for-request', auth, async (req, res) => {
+  try {
+    if (!process.env.AI_API_KEY || process.env.AI_API_KEY === 'your-groq-api-key-here') {
+      return res.status(503).json({ error: 'AI provider not configured' });
+    }
+    const { requestId } = req.body;
+    if (!requestId) return res.status(400).json({ error: 'requestId is required' });
+
+    // Only the recipient may ask for picks for a request
+    const songRequest = await prisma.songRequest.findUnique({ where: { id: requestId } });
+    if (!songRequest) return res.status(404).json({ error: 'Request not found' });
+    if (songRequest.recipientId !== req.userId) return res.status(403).json({ error: 'Not your request to respond to' });
+
+    const result = await rankSongsForRequest(prisma, req.userId, requestId);
+    res.json(result);
+  } catch (e) {
+    console.error('[ai/rank-for-request]', e.message);
+    res.status(500).json({ error: e.message || 'Failed to rank songs' });
   }
 });
 
