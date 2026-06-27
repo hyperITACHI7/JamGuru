@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
-import { Play, Pause, Music, Sparkles, RefreshCw, Share2 } from 'lucide-react'
+import { Play, Pause, Music, Sparkles, RefreshCw, Share2, Heart } from 'lucide-react'
 import TopBar from '../components/layout/TopBar'
 import { Link } from 'react-router-dom'
-import { searchSongs, getNewReleases } from '../api/songs'
+import { searchSongs, getNewReleases, isSongLiked, likeSong, unlikeSong } from '../api/songs'
 import { usePlayer } from '../context/PlayerContext'
 import { suggestForMe } from '../phase7/api/ai'
 import { getTaste } from '../api/taste'
@@ -104,6 +104,61 @@ function SongRow({ title, songs, offset = 0, count = 5 }) {
         {slice.map(song => <SongCard key={song.spotifyId} song={song} />)}
       </div>
     </section>
+  )
+}
+
+function ForYouCard({ song, onShare }) {
+  const player  = usePlayer()
+  const active  = player.isActive(song)
+  const playing = active && player.playing
+  const [liked, setLiked] = useState(false)
+
+  useEffect(() => {
+    isSongLiked(song.spotifyId).then(r => setLiked(r.data.liked)).catch(() => {})
+  }, [song.spotifyId])
+
+  async function handleLike(e) {
+    e.stopPropagation()
+    try {
+      if (liked) { await unlikeSong(song.spotifyId); setLiked(false) }
+      else        { await likeSong(song.spotifyId);   setLiked(true)  }
+    } catch {}
+  }
+
+  return (
+    <div className="group">
+      <div
+        className="bg-[#181818] hover:bg-[#282828] rounded-lg p-4 transition-colors relative cursor-pointer"
+        onClick={() => player.toggle(song)}
+      >
+        <div className="w-full aspect-square rounded-md overflow-hidden bg-[#282828] relative mb-3">
+          {song.albumArtUrl
+            ? <img src={song.albumArtUrl} alt={song.title} className="w-full h-full object-cover" />
+            : <div className="w-full h-full flex items-center justify-center"><Music size={32} className="text-white/20" /></div>
+          }
+          <div className={`absolute bottom-2 right-2 w-10 h-10 rounded-full bg-[#1DB954] flex items-center justify-center shadow-xl transition-all duration-200 ${playing ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0'}`}>
+            {playing ? <Pause size={16} className="fill-black text-black" /> : <Play size={16} className="fill-black text-black" />}
+          </div>
+        </div>
+        <p className={`font-semibold text-sm truncate ${active ? 'text-[#1DB954]' : 'text-white'}`}>{song.title}</p>
+        <p className="text-[#B3B3B3] text-xs mt-1 truncate">{song.artist}</p>
+      </div>
+      <div className="flex items-center gap-3 mt-2 px-1">
+        <button
+          onClick={handleLike}
+          className={`flex items-center gap-1 text-[10px] font-semibold transition-colors ${liked ? 'text-[#1DB954]' : 'text-[#B3B3B3] hover:text-white'}`}
+        >
+          <Heart size={10} className={liked ? 'fill-[#1DB954]' : ''} />
+          {liked ? 'Liked' : 'Like'}
+        </button>
+        <button
+          onClick={() => onShare(song)}
+          className="flex items-center gap-1 text-[10px] text-[#B3B3B3] hover:text-white font-semibold transition-colors"
+        >
+          <Share2 size={10} /> Share
+        </button>
+      </div>
+    </div>
   )
 }
 
@@ -253,24 +308,7 @@ export default function Home() {
                 {!forYouLoading && forYou.length > 0 && (
                   <div className="grid grid-cols-3 gap-4">
                     {forYou.map(song => (
-                      <div key={song.spotifyId} className="group">
-                        <div className="bg-[#181818] hover:bg-[#282828] rounded-lg p-4 transition-colors relative">
-                          <div className="w-full aspect-square rounded-md overflow-hidden bg-[#282828] relative mb-3">
-                            {song.albumArtUrl
-                              ? <img src={song.albumArtUrl} alt={song.title} className="w-full h-full object-cover" />
-                              : <div className="w-full h-full flex items-center justify-center"><Music size={32} className="text-white/20" /></div>
-                            }
-                          </div>
-                          <p className="text-white font-semibold text-sm truncate">{song.title}</p>
-                          <p className="text-[#B3B3B3] text-xs mt-1 truncate">{song.artist}</p>
-                          <button
-                            onClick={() => setShareSong(song)}
-                            className="mt-2 flex items-center gap-1 text-[10px] text-[#1DB954] font-semibold opacity-0 group-hover:opacity-100 transition-opacity"
-                          >
-                            <Share2 size={10} /> Share with friend
-                          </button>
-                        </div>
-                      </div>
+                      <ForYouCard key={song.spotifyId} song={song} onShare={setShareSong} />
                     ))}
                   </div>
                 )}

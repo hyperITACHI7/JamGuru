@@ -64,7 +64,7 @@ router.get('/:spotifyId', authMiddleware, async (req, res) => {
     const cached = await prisma.song.findUnique({ where: { spotifyId } });
     const isStale = cached && (Date.now() - cached.cachedAt.getTime() > CACHE_TTL_MS);
 
-    if (cached && !isStale) {
+    if (cached && !isStale && cached.previewUrl) {
       return res.json(cached);
     }
 

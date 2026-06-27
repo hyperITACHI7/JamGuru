@@ -21,7 +21,7 @@ function makeClient() {
   return { type: 'openai', client: new OpenAI.default(opts) };
 }
 
-async function callAI(prompt) {
+async function callAI(prompt, temperature = 0.7) {
   const model = process.env.AI_MODEL || 'llama-3.1-8b-instant';
   const { type, client } = makeClient();
 
@@ -38,7 +38,7 @@ async function callAI(prompt) {
     model,
     max_tokens: 200,
     messages: [{ role: 'user', content: prompt }],
-    temperature: 0.7,
+    temperature,
   });
   return completion.choices[0].message.content.trim();
 }
@@ -323,7 +323,19 @@ async function suggestForMe(prisma, userId) {
   const profile = user || {};
   const hasProfile = (profile.tasteGenres?.length || profile.tasteArtists?.length || topArtists.length > 0);
 
-  let prompt = `You are a music discovery assistant. Suggest 3 songs this user would love but hasn't heard yet.\n\n`;
+  const discoveryAngles = [
+    'Focus on hidden gems and deep cuts — avoid the most obvious hits.',
+    'Lean towards artists they probably haven\'t discovered yet.',
+    'Include songs from the 70s–90s that feel timeless.',
+    'Include recent releases from the last 2 years.',
+    'Pick songs with an unexpected emotional twist or contrast.',
+    'Suggest songs from genres adjacent to their usual taste.',
+    'Focus on critically acclaimed songs that are often overlooked.',
+    'Pick songs that are great for discovering new artists.',
+  ];
+  const angle = discoveryAngles[Math.floor(Math.random() * discoveryAngles.length)];
+
+  let prompt = `You are a music discovery assistant. Suggest 3 songs this user would love but hasn't heard yet.\nDiscovery angle this time: ${angle}\n\n`;
 
   if (profile.tasteGenres?.length)  prompt += `Their preferred genres: ${profile.tasteGenres.join(', ')}\n`;
   if (profile.tasteMoods?.length)   prompt += `Their preferred moods: ${profile.tasteMoods.join(', ')}\n`;
@@ -342,7 +354,7 @@ async function suggestForMe(prisma, userId) {
 
   prompt += `\nReturn ONLY a valid JSON array of exactly 3 songs, no extra text:\n[{"title":"...","artist":"..."},{"title":"...","artist":"..."},{"title":"...","artist":"..."}]`;
 
-  const raw = await callAI(prompt);
+  const raw = await callAI(prompt, 1.0);
   const jsonMatch = raw.match(/\[[\s\S]*?\]/);
   if (!jsonMatch) throw new Error('AI returned unexpected format');
 
