@@ -10,9 +10,9 @@ services:
     env: node
     plan: free
     buildCommand: >-
-      cd server && npm install &&
+      cd server && npm install --include=dev &&
       DATABASE_URL=postgresql://user:pass@localhost:5432/placeholder npx prisma generate &&
-      cd ../client && npm install && npm run build
+      cd ../client && npm install --include=dev && npm run build
     startCommand: cd server && npx prisma db push --accept-data-loss && node index.js
     envVars:
       - key: NODE_VERSION
