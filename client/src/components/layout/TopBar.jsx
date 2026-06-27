@@ -8,6 +8,7 @@ function getParentRoute(pathname) {
   if (pathname === '/search')           return '/'
   if (pathname === '/jamguru')          return '/'
   if (pathname === '/library')          return '/'
+  if (pathname === '/import-playlist')  return '/library'
   if (pathname === '/liked-songs')      return '/library'
   if (pathname === '/friends')          return '/jamguru'
   if (pathname === '/groups')           return '/'
