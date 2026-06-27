@@ -100,8 +100,12 @@ function SongRow({ title, songs, offset = 0, count = 5 }) {
           </button>
         )}
       </div>
-      <div className="grid grid-cols-5 gap-4">
-        {slice.map(song => <SongCard key={song.spotifyId} song={song} />)}
+      <div className="flex gap-4 overflow-x-auto pb-2 md:grid md:grid-cols-5 md:overflow-x-visible md:pb-0 scrollbar-hide">
+        {slice.map(song => (
+          <div key={song.spotifyId} className="min-w-[140px] w-[140px] md:min-w-0 md:w-auto flex-shrink-0 md:flex-shrink">
+            <SongCard song={song} />
+          </div>
+        ))}
       </div>
     </section>
   )
@@ -256,7 +260,7 @@ export default function Home() {
           <div className="space-y-8">
             {/* Quick picks */}
             {quickPicks.length > 0 && (
-              <div className="grid grid-cols-3 gap-2 mb-8">
+              <div className="grid grid-cols-2 gap-2 mb-8 md:grid-cols-3">
                 {quickPicks.map(song => <QuickPickCard key={song.spotifyId} song={song} />)}
               </div>
             )}
@@ -306,9 +310,11 @@ export default function Home() {
                 )}
 
                 {!forYouLoading && forYou.length > 0 && (
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="flex gap-4 overflow-x-auto pb-2 md:grid md:grid-cols-3 md:overflow-x-visible md:pb-0 scrollbar-hide">
                     {forYou.map(song => (
-                      <ForYouCard key={song.spotifyId} song={song} onShare={setShareSong} />
+                      <div key={song.spotifyId} className="min-w-[150px] w-[150px] md:min-w-0 md:w-auto flex-shrink-0 md:flex-shrink">
+                        <ForYouCard song={song} onShare={setShareSong} />
+                      </div>
                     ))}
                   </div>
                 )}
