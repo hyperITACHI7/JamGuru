@@ -146,17 +146,17 @@ async function getClientCredentialsToken() {
 async function getPlaylistTracks(playlistId, accessToken) {
   const tracks = [];
 
-  // Step 1: get metadata (name, cover) from the base playlist endpoint
-  const playlistRes = await axios.get(`${API_BASE}/playlists/${playlistId}`, {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
+  // Step 1: fetch playlist metadata + first 100 tracks via fields param.
+  // This avoids the /tracks sub-endpoint which requires extended app permissions.
+  const TRACK_FIELDS = 'name,description,images,tracks(items(track(id,name,type,artists(name),album(name,images(url)),preview_url)),total,next)';
+  const playlistRes = await axios.get(
+    `${API_BASE}/playlists/${playlistId}?fields=${encodeURIComponent(TRACK_FIELDS)}`,
+    { headers: { Authorization: `Bearer ${accessToken}` } }
+  );
 
   const data = playlistRes.data;
   console.log('[getPlaylistTracks] tracks keys:', Object.keys(data.tracks || {}));
-  console.log('[getPlaylistTracks] tracks.total:', data.tracks?.total, 'items:', data.tracks?.items?.length, 'href:', data.tracks?.href?.slice(0, 80));
-  if (data.tracks?.items?.length > 0) {
-    console.log('[getPlaylistTracks] first item sample:', JSON.stringify(data.tracks.items[0]).slice(0, 300));
-  }
+  console.log('[getPlaylistTracks] tracks.total:', data.tracks?.total, 'items:', data.tracks?.items?.length);
   const meta = {
     name:        data.name || 'Imported Playlist',
     description: data.description || null,
@@ -179,17 +179,12 @@ async function getPlaylistTracks(playlistId, accessToken) {
     }
   }
 
-  // Step 2: try embedded tracks first (fast path)
   extractItems(data.tracks?.items);
   const total = data.tracks?.total ?? 0;
-  console.log(`[getPlaylistTracks] "${data.name}" total=${total} embedded=${tracks.length} hasTracks=${data.tracks != null}`);
+  console.log(`[getPlaylistTracks] "${data.name}" total=${total} embedded=${tracks.length}`);
 
-  // Step 3: fetch via /tracks endpoint when:
-  //   - tracks field is absent from the response (data.tracks == null)
-  //   - or embedded items are fewer than total (pagination needed)
-  let nextUrl = (data.tracks == null || tracks.length < total)
-    ? `${API_BASE}/playlists/${playlistId}/tracks?limit=100`
-    : data.tracks?.next;
+  // Paginate if there are more tracks (next points to /tracks sub-endpoint)
+  let nextUrl = tracks.length < total ? data.tracks?.next : null;
 
   while (nextUrl) {
     console.log(`[getPlaylistTracks] GET ${nextUrl.slice(0, 100)}`);
