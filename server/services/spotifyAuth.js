@@ -23,6 +23,7 @@ function getAuthUrl(state) {
     scope:         SCOPES,
     redirect_uri:  REDIRECT_URI,
     state,
+    show_dialog:   'true',
   });
   return `${ACCOUNTS_BASE}/authorize?${params}`;
 }
@@ -140,29 +141,41 @@ async function getClientCredentialsToken() {
   return res.data.access_token;
 }
 
-// Fetch all tracks from a public playlist (paginates automatically)
+// Fetch all tracks from a playlist (paginates automatically)
 async function getPlaylistTracks(playlistId, accessToken) {
   const tracks = [];
-  let url = `${API_BASE}/playlists/${playlistId}/tracks?limit=100&fields=next,items(track(id,name,artists,album))`;
 
-  while (url) {
-    const res = await axios.get(url, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
-    const { items, next } = res.data;
+  // First page: use the playlist endpoint itself (broader access than /tracks sub-endpoint)
+  const playlistRes = await axios.get(`${API_BASE}/playlists/${playlistId}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+    params: { limit: 100 },
+  });
+
+  function extractItems(items) {
     for (const item of (items || [])) {
       const t = item?.track;
-      if (!t || !t.id) continue;
+      if (!t || !t.id || t.type !== 'track') continue;
       tracks.push({
         spotifyId:   t.id,
         title:       t.name,
-        artist:      t.artists.map(a => a.name).join(', '),
+        artist:      (t.artists || []).map(a => a.name).join(', '),
         album:       t.album?.name ?? '',
         albumArtUrl: t.album?.images?.[0]?.url ?? null,
-        previewUrl:  null,
+        previewUrl:  t.preview_url ?? null,
       });
     }
-    url = next;
+  }
+
+  extractItems(playlistRes.data.tracks?.items);
+  let nextUrl = playlistRes.data.tracks?.next;
+
+  // Subsequent pages via the /tracks endpoint
+  while (nextUrl) {
+    const res = await axios.get(nextUrl, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    extractItems(res.data.items);
+    nextUrl = res.data.next;
   }
 
   return tracks;
