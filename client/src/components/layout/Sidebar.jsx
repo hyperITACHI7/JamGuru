@@ -1,17 +1,7 @@
 import { useState, useEffect } from 'react'
-import { NavLink, useNavigate } from 'react-router-dom'
+import { NavLink } from 'react-router-dom'
 import { Home, Search, Library, Plus, ChevronLeft, Heart, Crown } from 'lucide-react'
 import api from '../../api/axios'
-
-function useIsMobile() {
-  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768)
-  useEffect(() => {
-    const handle = () => setIsMobile(window.innerWidth < 768)
-    window.addEventListener('resize', handle)
-    return () => window.removeEventListener('resize', handle)
-  }, [])
-  return isMobile
-}
 
 function SpotifyCircle() {
   return (
@@ -22,12 +12,7 @@ function SpotifyCircle() {
 }
 
 export default function Sidebar({ collapsed, setCollapsed }) {
-  const isMobile = useIsMobile()
-  const navigate = useNavigate()
   const [pendingCount, setPendingCount] = useState(0)
-
-  // On mobile the sidebar is always collapsed
-  const isCollapsed = isMobile ? true : collapsed
 
   useEffect(() => {
     api.get('/recommendations/pending-count')
@@ -46,43 +31,41 @@ export default function Sidebar({ collapsed, setCollapsed }) {
   const navLinkClass = ({ isActive }) =>
     `flex items-center gap-4 px-3 py-2 rounded-md text-sm font-semibold transition-colors whitespace-nowrap ${
       isActive ? 'text-white' : 'text-[#B3B3B3] hover:text-white'
-    } ${isCollapsed ? 'justify-center px-2' : ''}`
-
-  const sidebarWidth = isMobile ? '72px' : (collapsed ? '72px' : '280px')
+    } ${collapsed ? 'justify-center px-2' : ''}`
 
   return (
     <aside
       className="flex-shrink-0 flex flex-col gap-2 h-full overflow-hidden transition-all duration-300 ease-in-out"
-      style={{ width: sidebarWidth }}
+      style={{ width: collapsed ? '72px' : '280px' }}
     >
       {/* ── Top nav ── */}
       <nav className="bg-[#121212] rounded-xl px-2 py-2 flex-shrink-0">
-        <div className={`flex items-center gap-2 px-2 py-3 ${isCollapsed ? 'justify-center' : ''}`}>
+        <div className={`flex items-center gap-2 px-2 py-3 ${collapsed ? 'justify-center' : ''}`}>
           <SpotifyCircle />
-          {!isCollapsed && <span className="text-white font-bold text-lg tracking-tight overflow-hidden">JamGuru</span>}
+          {!collapsed && <span className="text-white font-bold text-lg tracking-tight overflow-hidden">JamGuru</span>}
         </div>
 
-        <NavLink to="/" end className={navLinkClass} title={isCollapsed ? 'Home' : ''}>
+        <NavLink to="/" end className={navLinkClass} title={collapsed ? 'Home' : ''}>
           {({ isActive }) => (
             <>
               <Home size={24} strokeWidth={isActive ? 0 : 1.5} className={`flex-shrink-0 ${isActive ? 'fill-white' : ''}`} />
-              {!isCollapsed && 'Home'}
+              {!collapsed && 'Home'}
             </>
           )}
         </NavLink>
 
-        <NavLink to="/search" className={navLinkClass} title={isCollapsed ? 'Search' : ''}>
+        <NavLink to="/search" className={navLinkClass} title={collapsed ? 'Search' : ''}>
           {({ isActive }) => (
             <>
               <Search size={24} strokeWidth={isActive ? 2.5 : 1.5} className="flex-shrink-0" />
-              {!isCollapsed && 'Search'}
+              {!collapsed && 'Search'}
             </>
           )}
         </NavLink>
 
         {/* ── JamGuru ── */}
         <div className="mt-2 pt-2 border-t border-white/10">
-          {!isCollapsed && (
+          {!collapsed && (
             <div className="flex items-center gap-2 px-3 mb-1">
               <Crown size={11} className="text-[#1DB954]" />
               <span className="text-[#B3B3B3] text-[10px] font-bold uppercase tracking-widest">JamGuru</span>
@@ -90,22 +73,22 @@ export default function Sidebar({ collapsed, setCollapsed }) {
           )}
           <NavLink
             to="/jamguru"
-            title={isCollapsed ? 'Discovery Inbox' : ''}
+            title={collapsed ? 'Discovery Inbox' : ''}
             className={({ isActive }) =>
               `flex items-center py-2 rounded-md transition-colors ${
                 isActive ? 'bg-[#282828]' : 'hover:bg-[#1A1A1A]'
-              } ${isCollapsed ? 'justify-center px-2' : 'gap-4 px-3'}`
+              } ${collapsed ? 'justify-center px-2' : 'gap-4 px-3'}`
             }
           >
             <div className="w-10 h-10 rounded-md bg-gradient-to-br from-[#1DB954] to-emerald-700 flex items-center justify-center flex-shrink-0 shadow-lg shadow-green-900/30 relative">
               <Crown size={16} className="text-black fill-black" />
-              {pendingCount > 0 && isCollapsed && (
+              {pendingCount > 0 && collapsed && (
                 <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full text-[9px] text-white font-bold flex items-center justify-center">
                   {pendingCount > 9 ? '9+' : pendingCount}
                 </span>
               )}
             </div>
-            {!isCollapsed && (
+            {!collapsed && (
               <div className="overflow-hidden">
                 <p className="text-white text-sm font-semibold leading-tight whitespace-nowrap">Discovery Inbox</p>
                 <p className={`text-xs mt-0.5 font-medium ${pendingCount > 0 ? 'text-[#1DB954]' : 'text-[#B3B3B3]'}`}>
@@ -117,90 +100,71 @@ export default function Sidebar({ collapsed, setCollapsed }) {
             )}
           </NavLink>
         </div>
-
-        {/* ── Library icon (mobile only — shown in top nav so all 4 icons are together) ── */}
-        {isMobile && (
-          <div className="mt-2 pt-2 border-t border-white/10">
-            <NavLink
-              to="/library"
-              className={({ isActive }) =>
-                `flex items-center justify-center py-2 px-2 rounded-md transition-colors ${
-                  isActive ? 'text-white' : 'text-[#B3B3B3] hover:text-white'
-                }`
-              }
-              title="Your Library"
-            >
-              <Library size={24} className="flex-shrink-0" />
-            </NavLink>
-          </div>
-        )}
       </nav>
 
-      {/* ── Library section (desktop only) ── */}
-      {!isMobile && (
-        <div className="bg-[#121212] rounded-xl flex-1 overflow-hidden flex flex-col min-h-0">
-          <div className={`flex items-center pt-4 pb-2 flex-shrink-0 px-3 ${isCollapsed ? 'justify-center' : 'justify-between'}`}>
-            <button
-              onClick={() => isCollapsed && setCollapsed(false)}
-              className="flex items-center gap-3 text-[#B3B3B3] hover:text-white font-semibold text-sm transition-colors"
-              title={isCollapsed ? 'Your Library' : ''}
-            >
-              <Library size={24} className="flex-shrink-0" />
-              {!isCollapsed && <span className="whitespace-nowrap">Your Library</span>}
-            </button>
+      {/* ── Library ── */}
+      <div className="bg-[#121212] rounded-xl flex-1 overflow-hidden flex flex-col min-h-0">
+        <div className={`flex items-center pt-4 pb-2 flex-shrink-0 px-3 ${collapsed ? 'justify-center' : 'justify-between'}`}>
+          <button
+            onClick={() => collapsed && setCollapsed(false)}
+            className="flex items-center gap-3 text-[#B3B3B3] hover:text-white font-semibold text-sm transition-colors"
+            title={collapsed ? 'Your Library' : ''}
+          >
+            <Library size={24} className="flex-shrink-0" />
+            {!collapsed && <span className="whitespace-nowrap">Your Library</span>}
+          </button>
 
-            {!isCollapsed && (
-              <div className="flex items-center gap-1">
-                <button className="text-[#B3B3B3] hover:text-white hover:bg-[#1A1A1A] p-2 rounded-full transition-colors" title="Create playlist">
-                  <Plus size={16} />
-                </button>
-                <button
-                  onClick={() => setCollapsed(true)}
-                  className="text-[#B3B3B3] hover:text-white hover:bg-[#1A1A1A] p-2 rounded-full transition-colors"
-                  title="Collapse sidebar"
-                >
-                  <ChevronLeft size={16} />
-                </button>
-              </div>
-            )}
-          </div>
-
-          {!isCollapsed && (
-            <div className="flex gap-2 px-3 pb-3 flex-shrink-0">
-              {['Playlists', 'Artists', 'Albums'].map(f => (
-                <button
-                  key={f}
-                  className="bg-[#232323] hover:bg-[#2a2a2a] text-white text-xs font-medium px-3 py-1.5 rounded-full transition-colors whitespace-nowrap"
-                >
-                  {f}
-                </button>
-              ))}
+          {!collapsed && (
+            <div className="flex items-center gap-1">
+              <button className="text-[#B3B3B3] hover:text-white hover:bg-[#1A1A1A] p-2 rounded-full transition-colors" title="Create playlist">
+                <Plus size={16} />
+              </button>
+              <button
+                onClick={() => setCollapsed(true)}
+                className="text-[#B3B3B3] hover:text-white hover:bg-[#1A1A1A] p-2 rounded-full transition-colors"
+                title="Collapse sidebar"
+              >
+                <ChevronLeft size={16} />
+              </button>
             </div>
           )}
-
-          <div className="flex-1 overflow-y-auto px-2 pb-2">
-            <NavLink
-              to="/liked-songs"
-              title={isCollapsed ? 'Liked Songs' : ''}
-              className={({ isActive }) =>
-                `flex items-center py-2 rounded-md transition-colors ${
-                  isActive ? 'bg-[#282828]' : 'hover:bg-[#1A1A1A]'
-                } ${isCollapsed ? 'justify-center px-1' : 'gap-3 px-3'}`
-              }
-            >
-              <div className="w-10 h-10 flex-shrink-0 rounded bg-gradient-to-br from-indigo-500 to-violet-800 flex items-center justify-center">
-                <Heart size={14} className="fill-white text-white" />
-              </div>
-              {!isCollapsed && (
-                <div className="overflow-hidden">
-                  <p className="text-white text-sm font-medium truncate leading-tight">Liked Songs</p>
-                  <p className="text-[#B3B3B3] text-xs mt-0.5">Playlist</p>
-                </div>
-              )}
-            </NavLink>
-          </div>
         </div>
-      )}
+
+        {!collapsed && (
+          <div className="flex gap-2 px-3 pb-3 flex-shrink-0">
+            {['Playlists', 'Artists', 'Albums'].map(f => (
+              <button
+                key={f}
+                className="bg-[#232323] hover:bg-[#2a2a2a] text-white text-xs font-medium px-3 py-1.5 rounded-full transition-colors whitespace-nowrap"
+              >
+                {f}
+              </button>
+            ))}
+          </div>
+        )}
+
+        <div className="flex-1 overflow-y-auto px-2 pb-2">
+          <NavLink
+            to="/liked-songs"
+            title={collapsed ? 'Liked Songs' : ''}
+            className={({ isActive }) =>
+              `flex items-center py-2 rounded-md transition-colors ${
+                isActive ? 'bg-[#282828]' : 'hover:bg-[#1A1A1A]'
+              } ${collapsed ? 'justify-center px-1' : 'gap-3 px-3'}`
+            }
+          >
+            <div className="w-10 h-10 flex-shrink-0 rounded bg-gradient-to-br from-indigo-500 to-violet-800 flex items-center justify-center">
+              <Heart size={14} className="fill-white text-white" />
+            </div>
+            {!collapsed && (
+              <div className="overflow-hidden">
+                <p className="text-white text-sm font-medium truncate leading-tight">Liked Songs</p>
+                <p className="text-[#B3B3B3] text-xs mt-0.5">Playlist</p>
+              </div>
+            )}
+          </NavLink>
+        </div>
+      </div>
     </aside>
   )
 }

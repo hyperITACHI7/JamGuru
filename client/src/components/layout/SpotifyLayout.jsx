@@ -1,12 +1,41 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useLocation } from 'react-router-dom'
 import Sidebar from './Sidebar'
 import NowPlayingBar from './NowPlayingBar'
+import MobileBottomNav from './MobileBottomNav'
 import { usePlayer } from '../../context/PlayerContext'
+
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768)
+  useEffect(() => {
+    const handle = () => setIsMobile(window.innerWidth < 768)
+    window.addEventListener('resize', handle)
+    return () => window.removeEventListener('resize', handle)
+  }, [])
+  return isMobile
+}
 
 export default function SpotifyLayout({ children }) {
   const [collapsed, setCollapsed] = useState(false)
   const { track } = usePlayer()
+  const isMobile = useIsMobile()
+  const location = useLocation()
 
+  // Mobile layout — no sidebar, bottom nav only on home
+  if (isMobile) {
+    const isHome = location.pathname === '/'
+    return (
+      <div className="h-screen flex flex-col bg-black overflow-hidden">
+        <main className="flex-1 bg-[#121212] overflow-hidden flex flex-col min-h-0">
+          {children}
+        </main>
+        {track && <NowPlayingBar />}
+        {isHome && <MobileBottomNav />}
+      </div>
+    )
+  }
+
+  // Desktop layout — unchanged
   return (
     <div className="h-screen flex flex-col bg-black overflow-hidden">
       <div className={`flex gap-2 p-2 min-h-0 ${track ? 'flex-1 pb-0' : 'flex-1 pb-2'}`}>
