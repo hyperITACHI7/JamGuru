@@ -123,4 +123,47 @@ async function getLikedTracks(accessToken) {
   return tracks;
 }
 
-module.exports = { getAuthUrl, exchangeCode, refreshAccessToken, getSpotifyProfile, getLikedTracks };
+// Fetch a short-lived app-level token using client credentials (no user needed)
+async function getClientCredentialsToken() {
+  const res = await axios.post(
+    `${ACCOUNTS_BASE}/api/token`,
+    qs.stringify({ grant_type: 'client_credentials' }),
+    {
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        Authorization:  'Basic ' + Buffer.from(`${CLIENT_ID}:${CLIENT_SECRET}`).toString('base64'),
+      },
+    }
+  );
+  return res.data.access_token;
+}
+
+// Fetch all tracks from a public playlist (paginates automatically)
+async function getPlaylistTracks(playlistId, accessToken) {
+  const tracks = [];
+  let url = `${API_BASE}/playlists/${playlistId}/tracks?limit=100&fields=next,items(track(id,name,artists,album))`;
+
+  while (url) {
+    const res = await axios.get(url, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    const { items, next } = res.data;
+    for (const item of (items || [])) {
+      const t = item?.track;
+      if (!t || !t.id) continue;
+      tracks.push({
+        spotifyId:   t.id,
+        title:       t.name,
+        artist:      t.artists.map(a => a.name).join(', '),
+        album:       t.album?.name ?? '',
+        albumArtUrl: t.album?.images?.[0]?.url ?? null,
+        previewUrl:  null,
+      });
+    }
+    url = next;
+  }
+
+  return tracks;
+}
+
+module.exports = { getAuthUrl, exchangeCode, refreshAccessToken, getSpotifyProfile, getLikedTracks, getClientCredentialsToken, getPlaylistTracks };

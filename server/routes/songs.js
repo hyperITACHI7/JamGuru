@@ -56,6 +56,68 @@ router.get('/browse/new-releases', authMiddleware, async (req, res) => {
   }
 });
 
+// ── GET /api/songs/:spotifyId/friend-matches ──────────────────────────────────
+// Returns the current user's friends sorted by taste compatibility with the song.
+// Score = overlapping tags / total unique song tags * 100 (0–100).
+router.get('/:spotifyId/friend-matches', authMiddleware, async (req, res) => {
+  const { spotifyId } = req.params;
+  try {
+    const [song, friendships] = await Promise.all([
+      prisma.song.findUnique({ where: { spotifyId }, select: { lastFmTags: true } }),
+      prisma.friendship.findMany({
+        where: {
+          status: 'ACCEPTED',
+          OR: [{ requesterId: req.userId }, { addresseeId: req.userId }],
+        },
+        include: {
+          requester: {
+            select: {
+              id: true, username: true, displayName: true, avatarUrl: true,
+              tasteGenres: true, tasteMoods: true, tasteArtists: true,
+            },
+          },
+          addressee: {
+            select: {
+              id: true, username: true, displayName: true, avatarUrl: true,
+              tasteGenres: true, tasteMoods: true, tasteArtists: true,
+            },
+          },
+        },
+      }),
+    ]);
+
+    const songTags = (song?.lastFmTags ?? []).map(t => t.toLowerCase());
+
+    const friends = friendships.map(f => {
+      const friend = f.requesterId === req.userId ? f.addressee : f.requester;
+      const tasteTags = [
+        ...(friend.tasteGenres  ?? []),
+        ...(friend.tasteMoods   ?? []),
+        ...(friend.tasteArtists ?? []),
+      ].map(t => t.toLowerCase());
+
+      const matchCount = songTags.filter(tag => tasteTags.includes(tag)).length;
+      const matchScore = songTags.length > 0
+        ? Math.round((matchCount / songTags.length) * 100)
+        : 0;
+
+      return {
+        id:          friend.id,
+        username:    friend.username,
+        displayName: friend.displayName,
+        avatarUrl:   friend.avatarUrl,
+        matchScore,
+      };
+    });
+
+    friends.sort((a, b) => b.matchScore - a.matchScore);
+    res.json({ friends });
+  } catch (e) {
+    console.error('[song/friend-matches]', e);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // ── GET /api/songs/:spotifyId ─────────────────────────────────────────────────
 router.get('/:spotifyId', authMiddleware, async (req, res) => {
   const { spotifyId } = req.params;

@@ -158,4 +158,90 @@ async function persistLikes(userId, tracks, res) {
   res.json({ synced: tracks.length, added });
 }
 
+// ── POST /api/auth/spotify/import-playlist ────────────────────────────────────
+// Import all songs from any public Spotify playlist URL into Liked Songs.
+// Uses client credentials — no user Spotify account needed.
+router.post('/import-playlist', authMiddleware, async (req, res) => {
+  const { playlistUrl } = req.body;
+  if (!playlistUrl) return res.status(400).json({ error: 'playlistUrl is required' });
+
+  // Extract playlist ID from URL formats:
+  //   https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M
+  //   spotify:playlist:37i9dQZF1DXcBWIGoYBM5M
+  const match = playlistUrl.match(/playlist[:/]([A-Za-z0-9]+)/);
+  if (!match) return res.status(400).json({ error: 'Could not parse playlist ID from URL' });
+  const playlistId = match[1];
+
+  try {
+    const token  = await spotifyAuth.getClientCredentialsToken();
+    const tracks = await spotifyAuth.getPlaylistTracks(playlistId, token);
+
+    if (tracks.length === 0) {
+      return res.json({ imported: 0, added: 0, message: 'Playlist is empty or private' });
+    }
+
+    // Resolve each track to an iTunes record so we get a previewUrl.
+    // Use the same search-by-title-artist fallback already in GET /api/songs/:id.
+    const spotify = require('../services/spotify');
+    const resolvedTracks = await Promise.all(
+      tracks.map(async t => {
+        // Check if we already have this Spotify ID cached
+        const cached = await prisma.song.findUnique({ where: { spotifyId: t.spotifyId } });
+        if (cached) return cached;
+
+        // Try iTunes search to get a previewUrl
+        try {
+          const results = await spotify.searchTracks(`${t.title} ${t.artist}`);
+          const match   = results.find(r => r.previewUrl) ?? results[0];
+          if (match) {
+            return { ...match, spotifyId: t.spotifyId, cachedAt: new Date() };
+          }
+        } catch { /* fall through */ }
+
+        // Store with Spotify metadata — previewUrl will resolve lazily on first play
+        return { ...t, cachedAt: new Date() };
+      })
+    );
+
+    // Upsert songs
+    await Promise.all(
+      resolvedTracks.map(t =>
+        prisma.song.upsert({
+          where:  { spotifyId: t.spotifyId },
+          create: t,
+          update: { ...t, cachedAt: new Date() },
+        })
+      )
+    );
+
+    // Fire-and-forget Last.fm tag enrichment
+    for (const t of resolvedTracks) {
+      enrichSongTags(prisma, t.spotifyId, t.title, t.artist);
+    }
+
+    // Upsert SongLikes
+    let added = 0;
+    for (const t of resolvedTracks) {
+      const existing = await prisma.songLike.findUnique({
+        where: { userId_spotifyId: { userId: req.userId, spotifyId: t.spotifyId } },
+      });
+      if (!existing) {
+        await prisma.songLike.create({ data: { userId: req.userId, spotifyId: t.spotifyId } });
+        added++;
+      }
+    }
+
+    // Refresh taste profile in background
+    refreshTasteProfile(prisma, req.userId).catch(() => {});
+
+    res.json({ imported: tracks.length, added });
+  } catch (err) {
+    console.error('Import playlist error:', err.message);
+    if (err.response?.status === 404) {
+      return res.status(404).json({ error: 'Playlist not found or is private' });
+    }
+    res.status(502).json({ error: 'Could not import playlist. Check the URL and try again.' });
+  }
+});
+
 module.exports = router;

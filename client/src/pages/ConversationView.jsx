@@ -225,62 +225,6 @@ export default function ConversationView({ friend, onBack }) {
         <FriendProfileSheet friend={friend} onClose={() => setShowProfile(false)} />
       )}
 
-      {/* AI suggest compose bar */}
-      <div className="flex-shrink-0 border-t border-white/5 bg-[#181818] px-4 py-3">
-        {suggested ? (
-          <div className="space-y-2">
-            {/* Suggested song preview */}
-            <div className="flex items-center gap-3 bg-[#282828] rounded-xl p-2.5">
-              <div className="w-10 h-10 flex-shrink-0 rounded-lg overflow-hidden bg-[#3e3e3e]">
-                {suggested.song.albumArtUrl
-                  ? <img src={suggested.song.albumArtUrl} alt={suggested.song.title} className="w-full h-full object-cover" />
-                  : <div className="w-full h-full flex items-center justify-center"><Music size={14} className="text-[#B3B3B3]" /></div>
-                }
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-white text-xs font-semibold truncate">{suggested.song.title}</p>
-                <p className="text-[#B3B3B3] text-[10px] truncate">{suggested.song.artist}</p>
-              </div>
-              <span className="text-[#1DB954] text-[9px] font-bold uppercase tracking-wider flex-shrink-0 flex items-center gap-1">
-                <Sparkles size={9} /> AI pick
-              </span>
-              <button onClick={() => { setSuggested(null); setSuggestNote('') }} className="text-[#535353] hover:text-white transition-colors ml-1">
-                <X size={14} />
-              </button>
-            </div>
-            {/* Context note */}
-            <div className="flex items-center gap-2">
-              <input
-                value={suggestNote}
-                onChange={e => setSuggestNote(e.target.value.slice(0, 200))}
-                placeholder={`Add a note for ${friend.displayName}… (optional)`}
-                className="flex-1 bg-[#282828] text-white text-xs rounded-full px-3 py-2 focus:outline-none focus:ring-1 focus:ring-[#1DB954]/50 placeholder-[#535353]"
-              />
-              <button
-                onClick={handleSendSuggested}
-                disabled={sending}
-                className="w-8 h-8 rounded-full bg-[#1DB954] flex items-center justify-center flex-shrink-0 disabled:opacity-50 hover:bg-[#1ed760] transition-colors"
-              >
-                <Send size={13} className="text-black fill-black" />
-              </button>
-            </div>
-            {suggestError && <p className="text-red-400 text-[10px]">{suggestError}</p>}
-          </div>
-        ) : (
-          <div className="flex items-center justify-between">
-            <p className="text-[#535353] text-xs">Share a song with {friend.displayName}</p>
-            <button
-              onClick={handleAiSuggest}
-              disabled={suggesting}
-              className="flex items-center gap-1.5 text-xs font-semibold text-[#1DB954] hover:text-[#1ed760] transition-colors disabled:opacity-50"
-            >
-              <Sparkles size={12} className={suggesting ? 'animate-pulse' : ''} />
-              {suggesting ? 'Finding perfect song…' : 'AI Suggest'}
-            </button>
-          </div>
-        )}
-      </div>
-
       {/* Chat area */}
       <div className="flex-1 overflow-y-auto py-4">
         {loading ? (
@@ -310,6 +254,60 @@ export default function ConversationView({ friend, onBack }) {
             ))}
             <div ref={bottomRef} />
           </>
+        )}
+      </div>
+
+      {/* AI suggest compose bar — pinned to bottom */}
+      <div className="flex-shrink-0 border-t border-white/5 bg-[#181818] px-4 py-3">
+        {suggested ? (
+          <div className="space-y-2">
+            <div className="flex items-center gap-3 bg-[#282828] rounded-xl p-2.5">
+              <div className="w-10 h-10 flex-shrink-0 rounded-lg overflow-hidden bg-[#3e3e3e]">
+                {suggested.song.albumArtUrl
+                  ? <img src={suggested.song.albumArtUrl} alt={suggested.song.title} className="w-full h-full object-cover" />
+                  : <div className="w-full h-full flex items-center justify-center"><Music size={14} className="text-[#B3B3B3]" /></div>
+                }
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-white text-xs font-semibold truncate">{suggested.song.title}</p>
+                <p className="text-[#B3B3B3] text-[10px] truncate">{suggested.song.artist}</p>
+              </div>
+              <span className="text-[#1DB954] text-[9px] font-bold uppercase tracking-wider flex-shrink-0 flex items-center gap-1">
+                <Sparkles size={9} /> AI pick
+              </span>
+              <button onClick={() => { setSuggested(null); setSuggestNote('') }} className="text-[#535353] hover:text-white transition-colors ml-1">
+                <X size={14} />
+              </button>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                value={suggestNote}
+                onChange={e => setSuggestNote(e.target.value.slice(0, 200))}
+                placeholder={`Add a note for ${friend.displayName}… (optional)`}
+                className="flex-1 bg-[#282828] text-white text-xs rounded-full px-3 py-2 focus:outline-none focus:ring-1 focus:ring-[#1DB954]/50 placeholder-[#535353]"
+              />
+              <button
+                onClick={handleSendSuggested}
+                disabled={sending}
+                className="w-8 h-8 rounded-full bg-[#1DB954] flex items-center justify-center flex-shrink-0 disabled:opacity-50 hover:bg-[#1ed760] transition-colors"
+              >
+                <Send size={13} className="text-black fill-black" />
+              </button>
+            </div>
+            {suggestError && <p className="text-red-400 text-[10px]">{suggestError}</p>}
+          </div>
+        ) : (
+          <div className="flex items-center justify-between">
+            <p className="text-[#535353] text-xs">Share a song with {friend.displayName}</p>
+            <button
+              onClick={handleAiSuggest}
+              disabled={suggesting}
+              className="flex items-center gap-1.5 text-xs font-semibold text-[#1DB954] hover:text-[#1ed760] transition-colors disabled:opacity-50"
+            >
+              <Sparkles size={12} className={suggesting ? 'animate-pulse' : ''} />
+              {suggesting ? 'Finding perfect song…' : 'AI Suggest'}
+            </button>
+          </div>
         )}
       </div>
     </div>

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { Crown, Sparkles, RefreshCw, UserPlus, UserCheck } from 'lucide-react'
 import TopBar from '../components/layout/TopBar'
+import FindFriendsSheet from '../components/FindFriendsSheet'
 import { getMe } from '../api/auth'
 import { getProfile, updateProfile } from '../api/users'
 import { getTaste, getTasteByUser, updateTaste, refreshTaste } from '../api/taste'
@@ -88,6 +89,7 @@ export default function Profile() {
   const [isOwnProfile, setIsOwnProfile] = useState(false)
   const [friendStatus, setFriendStatus] = useState(null)
   const [addingFriend, setAddingFriend] = useState(false)
+  const [showFindFriends, setShowFindFriends] = useState(false)
   const [editing, setEditing]         = useState(false)
   const [form, setForm]               = useState({ displayName: '', bio: '' })
   const [loading, setLoading]         = useState(true)
@@ -247,6 +249,8 @@ export default function Profile() {
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
+      {showFindFriends && <FindFriendsSheet onClose={() => setShowFindFriends(false)} />}
+
       {/* Gradient header */}
       <div className="relative flex-shrink-0">
         <div className="absolute inset-0 bg-gradient-to-b from-indigo-900/60 via-[#121212]/50 to-transparent pointer-events-none" />
@@ -286,6 +290,12 @@ export default function Profile() {
                   className="border border-[#878787] hover:border-white text-white text-sm font-semibold px-6 py-1.5 rounded-full transition-colors"
                 >
                   {editingTaste ? 'Cancel' : 'Edit taste'}
+                </button>
+                <button
+                  onClick={() => setShowFindFriends(true)}
+                  className="flex items-center gap-1.5 border border-[#878787] hover:border-white text-white text-sm font-semibold px-5 py-1.5 rounded-full transition-colors"
+                >
+                  <UserPlus size={14} /> Find Friends
                 </button>
                 <button
                   onClick={handleLogout}
