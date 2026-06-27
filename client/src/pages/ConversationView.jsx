@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { ArrowLeft, Play, Pause, Heart, Music, MessageCircle, Sparkles, Send, X, ChevronRight, ThumbsDown } from 'lucide-react'
+import { ArrowLeft, Play, Pause, Heart, Music, MessageCircle, Sparkles, Send, X, ChevronRight, ThumbsDown, Plus, Search } from 'lucide-react'
 import FriendProfileSheet from '../components/FriendProfileSheet'
 import { getConversation, sendRecommendation } from '../phase3/api/recommendations'
 import {
@@ -7,6 +7,7 @@ import {
   dismissRecommendation, undismissRecommendation,
   dislikeRecommendation, undislikeRecommendation,
 } from '../phase4/api/likes'
+import { getLikedSongs } from '../api/songs'
 import FeedbackTags from '../phase4/components/FeedbackTags'
 import { usePlayer } from '../context/PlayerContext'
 import { getAiSuggestion } from '../phase7/api/ai'
@@ -64,7 +65,7 @@ function Bubble({ msg, onLike, justLiked }) {
         isSent ? 'bg-[#1DB954]/15 rounded-tr-sm' : 'bg-[#282828] rounded-tl-sm'
       } ${dislikeActive ? 'opacity-60' : ''}`}>
 
-        {/* Song row — art + info + right column (play / like) */}
+        {/* Song row */}
         <div className="flex items-center gap-2.5">
           <div className="w-11 h-11 flex-shrink-0 rounded-lg overflow-hidden bg-[#3e3e3e]">
             {msg.song.albumArtUrl
@@ -105,7 +106,6 @@ function Bubble({ msg, onLike, justLiked }) {
               </button>
             </div>
           ) : (
-            /* Sent — play button only on right */
             msg.song.previewUrl && (
               <button
                 onClick={() => player.toggle(msg.song)}
@@ -119,12 +119,11 @@ function Bubble({ msg, onLike, justLiked }) {
           )}
         </div>
 
-        {/* Context note */}
         {msg.context && (
           <p className="text-white/60 text-xs italic mt-2 leading-relaxed">"{msg.context}"</p>
         )}
 
-        {/* SENT — show recipient reaction */}
+        {/* SENT — recipient reaction */}
         {isSent && (
           <div className="mt-2 flex items-center gap-2 flex-wrap">
             <span className={`flex items-center gap-1 text-[10px] font-medium ${
@@ -148,7 +147,6 @@ function Bubble({ msg, onLike, justLiked }) {
         {/* RECEIVED — tag picker + bottom reaction row */}
         {!isSent && (
           <>
-            {/* Previously saved tags */}
             {msg.liked && !justLiked && msg.tags.length > 0 && (
               <div className="flex flex-wrap gap-1 mt-2 mb-1">
                 {msg.tags.map(tag => (
@@ -160,7 +158,6 @@ function Bubble({ msg, onLike, justLiked }) {
             )}
             {tagPickerOpen && <FeedbackTags likeId={msg.likeId} />}
 
-            {/* Bottom row — Not for me (left) · Not my vibe (right) */}
             <div className="mt-2 pt-1.5 border-t border-white/5 flex items-center justify-between">
               <button
                 onClick={handleDismiss}
@@ -205,13 +202,21 @@ export default function ConversationView({ friend, onBack }) {
   const [liking, setLiking]             = useState(null)
   const [justLikedIds, setJustLikedIds] = useState(new Set())
 
-  const [suggesting, setSuggesting]   = useState(false)
-  const [suggested, setSuggested]     = useState(null)
-  const [suggestNote, setSuggestNote] = useState('')
-  const [sending, setSending]         = useState(false)
+  // AI suggest state
+  const [suggesting, setSuggesting]     = useState(false)
+  const [suggested, setSuggested]       = useState(null) // { song, aiQuery? }
+  const [suggestNote, setSuggestNote]   = useState('')
+  const [sending, setSending]           = useState(false)
   const [suggestError, setSuggestError] = useState('')
 
-  const bottomRef = useRef(null)
+  // Library picker state
+  const [showLibrary, setShowLibrary]       = useState(false)
+  const [librarySongs, setLibrarySongs]     = useState([])
+  const [libraryLoading, setLibraryLoading] = useState(false)
+  const [librarySearch, setLibrarySearch]   = useState('')
+
+  const bottomRef    = useRef(null)
+  const searchRef    = useRef(null)
 
   useEffect(() => {
     setLoading(true)
@@ -225,6 +230,41 @@ export default function ConversationView({ friend, onBack }) {
   useEffect(() => {
     if (!loading) bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [loading, messages.length])
+
+  // Focus search when library opens
+  useEffect(() => {
+    if (showLibrary) {
+      setTimeout(() => searchRef.current?.focus(), 50)
+    }
+  }, [showLibrary])
+
+  async function openLibrary() {
+    setShowLibrary(true)
+    setLibrarySearch('')
+    if (librarySongs.length === 0) {
+      setLibraryLoading(true)
+      try {
+        const { data } = await getLikedSongs()
+        setLibrarySongs(data.songs || [])
+      } catch (_) {}
+      setLibraryLoading(false)
+    }
+  }
+
+  function selectSong(song) {
+    setSuggested({ song })
+    setSuggestNote('')
+    setSuggestError('')
+    setShowLibrary(false)
+    setLibrarySearch('')
+  }
+
+  const filteredSongs = librarySearch.trim()
+    ? librarySongs.filter(s =>
+        s.title.toLowerCase().includes(librarySearch.toLowerCase()) ||
+        s.artist.toLowerCase().includes(librarySearch.toLowerCase())
+      )
+    : librarySongs
 
   async function handleLike(msg) {
     if (liking === msg.id) return
@@ -262,7 +302,7 @@ export default function ConversationView({ friend, onBack }) {
     }
   }
 
-  async function handleSendSuggested() {
+  async function handleSend() {
     if (!suggested) return
     setSending(true)
     try {
@@ -343,10 +383,73 @@ export default function ConversationView({ friend, onBack }) {
         )}
       </div>
 
-      {/* AI suggest compose bar */}
+      {/* Library picker — slides up between chat and compose bar */}
+      {showLibrary && (
+        <div className="flex-shrink-0 border-t border-white/5 bg-[#181818] flex flex-col" style={{ maxHeight: '280px' }}>
+          {/* Library header + search */}
+          <div className="flex items-center gap-2 px-4 pt-3 pb-2 flex-shrink-0">
+            <div className="flex-1 flex items-center gap-2 bg-[#282828] rounded-full px-3 py-1.5">
+              <Search size={12} className="text-[#535353] flex-shrink-0" />
+              <input
+                ref={searchRef}
+                value={librarySearch}
+                onChange={e => setLibrarySearch(e.target.value)}
+                placeholder="Search your library…"
+                className="flex-1 bg-transparent text-white text-xs focus:outline-none placeholder-[#535353]"
+              />
+              {librarySearch && (
+                <button onClick={() => setLibrarySearch('')} className="text-[#535353] hover:text-white">
+                  <X size={11} />
+                </button>
+              )}
+            </div>
+            <button
+              onClick={() => setShowLibrary(false)}
+              className="text-[#535353] hover:text-white transition-colors flex-shrink-0"
+            >
+              <X size={16} />
+            </button>
+          </div>
+
+          {/* Song list */}
+          <div className="overflow-y-auto flex-1">
+            {libraryLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="w-5 h-5 border-2 border-[#1DB954] border-t-transparent rounded-full animate-spin" />
+              </div>
+            ) : filteredSongs.length === 0 ? (
+              <p className="text-center text-[#535353] text-xs py-8">
+                {librarySearch ? 'No songs match your search' : 'Your library is empty'}
+              </p>
+            ) : (
+              filteredSongs.map(song => (
+                <button
+                  key={song.spotifyId}
+                  onClick={() => selectSong(song)}
+                  className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/5 transition-colors text-left"
+                >
+                  <div className="w-9 h-9 flex-shrink-0 rounded-md overflow-hidden bg-[#282828]">
+                    {song.albumArtUrl
+                      ? <img src={song.albumArtUrl} alt={song.title} className="w-full h-full object-cover" />
+                      : <div className="w-full h-full flex items-center justify-center"><Music size={12} className="text-[#535353]" /></div>
+                    }
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-white text-xs font-medium truncate">{song.title}</p>
+                    <p className="text-[#B3B3B3] text-[10px] truncate mt-0.5">{song.artist}</p>
+                  </div>
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Compose bar */}
       <div className="flex-shrink-0 border-t border-white/5 bg-[#181818] px-4 py-3">
         {suggested ? (
           <div className="space-y-2">
+            {/* Selected song preview */}
             <div className="flex items-center gap-3 bg-[#282828] rounded-xl p-2.5">
               <div className="w-10 h-10 flex-shrink-0 rounded-lg overflow-hidden bg-[#3e3e3e]">
                 {suggested.song.albumArtUrl
@@ -358,13 +461,19 @@ export default function ConversationView({ friend, onBack }) {
                 <p className="text-white text-xs font-semibold truncate">{suggested.song.title}</p>
                 <p className="text-[#B3B3B3] text-[10px] truncate">{suggested.song.artist}</p>
               </div>
-              <span className="text-[#1DB954] text-[9px] font-bold uppercase tracking-wider flex-shrink-0 flex items-center gap-1">
-                <Sparkles size={9} /> AI pick
-              </span>
-              <button onClick={() => { setSuggested(null); setSuggestNote('') }} className="text-[#535353] hover:text-white transition-colors ml-1">
+              {suggested.aiQuery && (
+                <span className="text-[#1DB954] text-[9px] font-bold uppercase tracking-wider flex-shrink-0 flex items-center gap-1">
+                  <Sparkles size={9} /> AI pick
+                </span>
+              )}
+              <button
+                onClick={() => { setSuggested(null); setSuggestNote(''); setSuggestError('') }}
+                className="text-[#535353] hover:text-white transition-colors ml-1"
+              >
                 <X size={14} />
               </button>
             </div>
+            {/* Note input + send */}
             <div className="flex items-center gap-2">
               <input
                 value={suggestNote}
@@ -373,7 +482,7 @@ export default function ConversationView({ friend, onBack }) {
                 className="flex-1 bg-[#282828] text-white text-xs rounded-full px-3 py-2 focus:outline-none focus:ring-1 focus:ring-[#1DB954]/50 placeholder-[#535353]"
               />
               <button
-                onClick={handleSendSuggested}
+                onClick={handleSend}
                 disabled={sending}
                 className="w-8 h-8 rounded-full bg-[#1DB954] flex items-center justify-center flex-shrink-0 disabled:opacity-50 hover:bg-[#1ed760] transition-colors"
               >
@@ -383,15 +492,30 @@ export default function ConversationView({ friend, onBack }) {
             {suggestError && <p className="text-red-400 text-[10px]">{suggestError}</p>}
           </div>
         ) : (
-          <div className="flex items-center justify-between">
-            <p className="text-[#535353] text-xs">Share a song with {friend.displayName}</p>
+          <div className="flex items-center gap-2">
+            <p className="text-[#535353] text-xs flex-1 truncate">Share a song with {friend.displayName}</p>
+
+            {/* Library picker button */}
+            <button
+              onClick={openLibrary}
+              title="Pick from your library"
+              className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 transition-colors ${
+                showLibrary
+                  ? 'bg-[#1DB954] text-black'
+                  : 'bg-[#282828] text-[#B3B3B3] hover:text-white hover:bg-[#3e3e3e]'
+              }`}
+            >
+              <Plus size={15} />
+            </button>
+
+            {/* AI suggest button */}
             <button
               onClick={handleAiSuggest}
               disabled={suggesting}
-              className="flex items-center gap-1.5 text-xs font-semibold text-[#1DB954] hover:text-[#1ed760] transition-colors disabled:opacity-50"
+              className="flex items-center gap-1.5 text-xs font-semibold text-[#1DB954] hover:text-[#1ed760] transition-colors disabled:opacity-50 flex-shrink-0"
             >
               <Sparkles size={12} className={suggesting ? 'animate-pulse' : ''} />
-              {suggesting ? 'Finding perfect song…' : 'AI Suggest'}
+              {suggesting ? 'Finding…' : 'AI Suggest'}
             </button>
           </div>
         )}
