@@ -63,22 +63,37 @@ async function recomputeScores(prisma, { recommendationId, likerId }) {
   });
 
   // ── 3. Personal trust ranking: liker → sender ──────────────────────────────
+  // trustScore = SUM over each day sender sent recs of (liked_that_day / sent_that_day)
+  // Rewards consistent daily quality; someone who sent 1 rec once can't permanently
+  // outrank someone sending great picks every day.
 
-  // How many of sender's recs to liker did liker like this month?
-  const likesGiven = await prisma.like.count({
-    where: {
-      likerId,
-      recommendation: { senderId, recipientId: likerId },
-      likedAt: { gte: monthStart },
-    },
-  });
-
-  // How many recs has sender sent to liker this month?
-  const recsReceived = await prisma.recommendation.count({
+  const allRecs = await prisma.recommendation.findMany({
     where: { senderId, recipientId: likerId, sentAt: { gte: monthStart } },
+    select: { id: true, sentAt: true },
   });
 
-  const trustScore = recsReceived > 0 ? likesGiven / recsReceived : 0;
+  const likedIds = new Set(
+    (await prisma.like.findMany({
+      where: { likerId, recommendationId: { in: allRecs.map(r => r.id) } },
+      select: { recommendationId: true },
+    })).map(l => l.recommendationId)
+  );
+
+  const byDay = new Map();
+  for (const rec of allRecs) {
+    const day = rec.sentAt.toISOString().slice(0, 10);
+    if (!byDay.has(day)) byDay.set(day, { sent: 0, liked: 0 });
+    byDay.get(day).sent++;
+    if (likedIds.has(rec.id)) byDay.get(day).liked++;
+  }
+
+  let trustScore = 0;
+  for (const { sent, liked } of byDay.values()) {
+    if (sent > 0) trustScore += liked / sent;
+  }
+
+  const likesGiven   = likedIds.size;
+  const recsReceived = allRecs.length;
 
   await prisma.personalTrustRanking.upsert({
     where: { ownerId_friendId_month: { ownerId: likerId, friendId: senderId, month: monthStart } },

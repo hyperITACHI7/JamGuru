@@ -7,6 +7,7 @@ import { getProfile, updateProfile } from '../api/users'
 import { getTaste, getTasteByUser, updateTaste, refreshTaste } from '../api/taste'
 import { getFriends, getFriendRequests, acceptFriendRequest, sendFriendRequest, searchUsers } from '../phase3/api/friends'
 import { getGroups } from '../phase5/api/groups'
+import { getJamGuruCount } from '../phase4/api/jamguru'
 
 const GENRE_OPTIONS = [
   'hip-hop', 'r&b', 'pop', 'rock', 'indie', 'electronic',
@@ -104,6 +105,9 @@ export default function Profile() {
   const [refreshingTaste, setRefreshingTaste] = useState(false)
   const [tasteSaving, setTasteSaving]   = useState(false)
 
+  // JamGuru listener count (own profile — getMe() doesn't include this)
+  const [jamGuruForCount, setJamGuruForCount] = useState(0)
+
   // Social state (own profile only)
   const [friends, setFriends]           = useState([])
   const [requests, setRequests]         = useState([])
@@ -149,11 +153,21 @@ export default function Profile() {
   }
 
   async function loadSocialData() {
-    const [fr, rq, gr] = await Promise.allSettled([getFriends(), getFriendRequests(), getGroups()])
+    const [fr, rq, gr, jg] = await Promise.allSettled([
+      getFriends(), getFriendRequests(), getGroups(), getJamGuruCount(),
+    ])
     if (fr.status === 'fulfilled') setFriends(fr.value.data ?? [])
     if (rq.status === 'fulfilled') setRequests(rq.value.data ?? [])
     if (gr.status === 'fulfilled') setGroups(gr.value.data ?? [])
+    if (jg.status === 'fulfilled') setJamGuruForCount(jg.value.data?.count ?? 0)
   }
+
+  useEffect(() => {
+    if (!isOwnProfile) return
+    const refresh = () => getJamGuruCount().then(({ data }) => setJamGuruForCount(data?.count ?? 0)).catch(() => {})
+    window.addEventListener('jam:like', refresh)
+    return () => window.removeEventListener('jam:like', refresh)
+  }, [isOwnProfile])
 
   async function loadTaste(u) {
     try {
@@ -282,7 +296,8 @@ export default function Profile() {
     taste.artists?.length || taste.eras?.length
   )
 
-  const friendCount = isOwnProfile ? friends.length : (user?.friendCount ?? 0)
+  const friendCount    = isOwnProfile ? friends.length : (user?.friendCount ?? 0)
+  const listenerCount  = isOwnProfile ? jamGuruForCount : (user?.jamGuruForCount ?? 0)
 
   if (loading) {
     return (
@@ -329,8 +344,8 @@ export default function Profile() {
                 <span className="text-[#B3B3B3]">friend{friendCount !== 1 ? 's' : ''}</span>
               </p>
               <p className="text-white text-sm">
-                <span className="font-bold">{user.jamGuruForCount ?? 0}</span>{' '}
-                <span className="text-[#B3B3B3]">listener{user.jamGuruForCount !== 1 ? 's' : ''} this month</span>
+                <span className="font-bold">{listenerCount}</span>{' '}
+                <span className="text-[#B3B3B3]">listener{listenerCount !== 1 ? 's' : ''} this month</span>
               </p>
             </div>
           </div>
@@ -527,8 +542,8 @@ export default function Profile() {
               <div>
                 <p className="text-white font-semibold">
                   JamGuru for{' '}
-                  <span className="text-[#1DB954]">{user.jamGuruForCount ?? 0}</span>{' '}
-                  listener{user.jamGuruForCount !== 1 ? 's' : ''}
+                  <span className="text-[#1DB954]">{listenerCount}</span>{' '}
+                  listener{listenerCount !== 1 ? 's' : ''}
                 </p>
                 <p className="text-[#B3B3B3] text-xs mt-0.5">This month's recommendations</p>
               </div>
