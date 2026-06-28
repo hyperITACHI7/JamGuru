@@ -244,6 +244,18 @@ export default function GroupConversationView({ group, onBack }) {
     loadFeed().finally(() => setLoading(false))
   }, [group.id])
 
+  // Live updates — reload feed when anyone in this group posts
+  useEffect(() => {
+    function handleSse(e) {
+      const { type, groupId } = e.detail ?? {}
+      if (type === 'new_group_activity' && groupId === group.id) {
+        loadFeed()
+      }
+    }
+    window.addEventListener('jam:sse', handleSse)
+    return () => window.removeEventListener('jam:sse', handleSse)
+  }, [group.id])
+
   useEffect(() => {
     if (!loading) bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [loading, messages.length])
@@ -418,6 +430,7 @@ export default function GroupConversationView({ group, onBack }) {
       })
       await loadFeed()
       setSuggested(null); setSuggestNote(''); setPendingGroupRequestId(null)
+      window.dispatchEvent(new CustomEvent('jam:like'))
     } catch (e) {
       setSuggestError(e.response?.data?.error || 'Failed to send.')
     } finally {

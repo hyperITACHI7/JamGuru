@@ -30,6 +30,66 @@ router.get('/', auth, async (req, res) => {
   }
 });
 
+// GET /api/friends/inbox-summary — per-friend and per-group unreacted activity counts
+router.get('/inbox-summary', auth, async (req, res) => {
+  const me = req.userId;
+  try {
+    const [dmNewRecs, dmOpenReqs, groupNewRecs, groupOpenReqs] = await Promise.all([
+      // DM recs from friends not yet liked or dismissed
+      prisma.recommendation.findMany({
+        where: { recipientId: me, groupId: null, dismissedAt: null, likes: { none: { likerId: me } } },
+        select: { senderId: true },
+      }),
+      // DM song requests I received that are still open
+      prisma.songRequest.findMany({
+        where: { recipientId: me, status: 'OPEN' },
+        select: { senderId: true },
+      }),
+      // Group recs not from me, not liked/dismissed by me
+      prisma.recommendation.findMany({
+        where: {
+          groupId: { not: null },
+          senderId: { not: me },
+          dismissedAt: null,
+          likes: { none: { likerId: me } },
+          group: { members: { some: { userId: me } } },
+        },
+        select: { groupId: true },
+      }),
+      // Group requests not from me, still open
+      prisma.groupSongRequest.findMany({
+        where: {
+          senderId: { not: me },
+          status: 'OPEN',
+          group: { members: { some: { userId: me } } },
+        },
+        select: { groupId: true },
+      }),
+    ]);
+
+    const dmSongs = {}, dmReqs = {}, grpSongs = {}, grpReqs = {};
+    for (const r of dmNewRecs)  dmSongs[r.senderId] = (dmSongs[r.senderId] ?? 0) + 1;
+    for (const r of dmOpenReqs) dmReqs[r.senderId]  = (dmReqs[r.senderId]  ?? 0) + 1;
+    for (const r of groupNewRecs)  grpSongs[r.groupId] = (grpSongs[r.groupId] ?? 0) + 1;
+    for (const r of groupOpenReqs) grpReqs[r.groupId]  = (grpReqs[r.groupId]  ?? 0) + 1;
+
+    const friendIds = [...new Set([...Object.keys(dmSongs), ...Object.keys(dmReqs)])];
+    const groupIds  = [...new Set([...Object.keys(grpSongs), ...Object.keys(grpReqs)])];
+
+    res.json({
+      friends: friendIds.map(id => ({
+        friendId: id, newSongsCount: dmSongs[id] ?? 0, openRequestCount: dmReqs[id] ?? 0,
+      })),
+      groups: groupIds.map(id => ({
+        groupId: id, newSongsCount: grpSongs[id] ?? 0, openRequestCount: grpReqs[id] ?? 0,
+      })),
+    });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // GET /api/friends/requests — incoming pending requests
 router.get('/requests', auth, async (req, res) => {
   try {

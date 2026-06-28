@@ -2,6 +2,7 @@ const express = require('express');
 const { PrismaClient } = require('@prisma/client');
 const auth = require('../../middleware/auth');
 const { thisMonthStart } = require('../../services/phase4/scoring');
+const { notify } = require('../../sse');
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -69,6 +70,8 @@ router.post('/', auth, async (req, res) => {
       create: { userId: req.userId, scoreDate: today, recsSent: 1, likesReceived: 0, dailyScore: 0 },
       update: { recsSent: { increment: 1 } },
     });
+
+    notify(recipientId, 'new_dm_rec', { fromFriendId: req.userId });
 
     res.status(201).json(rec);
   } catch (e) {

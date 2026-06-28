@@ -282,6 +282,18 @@ export default function ConversationView({ friend, onBack }) {
       .finally(() => setLoading(false))
   }, [friend.id])
 
+  // Live updates — reload conversation when the open friend sends a new message
+  useEffect(() => {
+    function handleSse(e) {
+      const { type, fromFriendId } = e.detail ?? {}
+      if ((type === 'new_dm_rec' || type === 'new_dm_req') && fromFriendId === friend.id) {
+        getConversation(friend.id).then(({ data }) => setMessages(data)).catch(() => {})
+      }
+    }
+    window.addEventListener('jam:sse', handleSse)
+    return () => window.removeEventListener('jam:sse', handleSse)
+  }, [friend.id])
+
   useEffect(() => {
     if (!loading) bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [loading, messages.length])
@@ -498,6 +510,7 @@ export default function ConversationView({ friend, onBack }) {
       setSuggested(null)
       setSuggestNote('')
       setPendingRequestId(null)
+      window.dispatchEvent(new CustomEvent('jam:like'))
     } catch (e) {
       setSuggestError(e.response?.data?.error || 'Failed to send.')
     } finally {

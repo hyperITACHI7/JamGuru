@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { MessageCircle, Users, UserPlus, Plus } from 'lucide-react'
 import { Link } from 'react-router-dom'
-import { getFriends } from '../phase3/api/friends'
+import { getFriends, getInboxSummary } from '../phase3/api/friends'
 import { getGroups } from '../phase5/api/groups'
 
 export default function FriendsDmPanel({ selected, onSelect, className = '' }) {
@@ -9,6 +9,20 @@ export default function FriendsDmPanel({ selected, onSelect, className = '' }) {
   const [friends, setFriends] = useState([])
   const [groups, setGroups]   = useState([])
   const [loading, setLoading] = useState(true)
+  // summary: { friends: { [friendId]: { newSongsCount, openRequestCount } }, groups: { [groupId]: {...} } }
+  const [summary, setSummary] = useState({ friends: {}, groups: {} })
+
+  const fetchSummary = useCallback(() => {
+    getInboxSummary()
+      .then(({ data }) => {
+        const friends = {}
+        const groups  = {}
+        for (const f of data.friends ?? []) friends[f.friendId] = f
+        for (const g of data.groups  ?? []) groups[g.groupId]   = g
+        setSummary({ friends, groups })
+      })
+      .catch(() => {})
+  }, [])
 
   useEffect(() => {
     setLoading(true)
@@ -19,9 +33,20 @@ export default function FriendsDmPanel({ selected, onSelect, className = '' }) {
       })
       .catch(() => {})
       .finally(() => setLoading(false))
-  }, [])
+    fetchSummary()
+  }, [fetchSummary])
 
-  // When switching tabs, deselect if the selected entity belongs to the other tab
+  // Re-fetch summary on any like/dismiss action or SSE event
+  useEffect(() => {
+    const handler = () => fetchSummary()
+    window.addEventListener('jam:like', handler)
+    window.addEventListener('jam:sse', handler)
+    return () => {
+      window.removeEventListener('jam:like', handler)
+      window.removeEventListener('jam:sse', handler)
+    }
+  }, [fetchSummary])
+
   function switchTab(next) {
     setTab(next)
     if (selected && selected.type !== next.replace('friends', 'friend').replace('groups', 'group')) {
@@ -31,6 +56,29 @@ export default function FriendsDmPanel({ selected, onSelect, className = '' }) {
 
   const isFriendSelected = (f) => selected?.type === 'friend' && selected?.data?.id === f.id
   const isGroupSelected  = (g) => selected?.type === 'group'  && selected?.data?.id === g.id
+
+  function friendSubtitle(f) {
+    const s = summary.friends[f.id]
+    if (s?.openRequestCount > 0) return { text: 'Requested a song', green: true }
+    if (s?.newSongsCount    > 0) return {
+      text: `Sent ${s.newSongsCount} new song${s.newSongsCount > 1 ? 's' : ''}`,
+      green: false,
+    }
+    return { text: `@${f.username}`, green: false, muted: true }
+  }
+
+  function groupSubtitle(g) {
+    const s = summary.groups[g.id]
+    const songs = s?.newSongsCount    ?? 0
+    const reqs  = s?.openRequestCount ?? 0
+    if (songs === 0 && reqs === 0) {
+      return { text: `${g.memberCount ?? g._count?.members ?? 0} members`, green: false, muted: true }
+    }
+    const parts = []
+    if (songs > 0) parts.push(`${songs} song recommendation${songs > 1 ? 's' : ''}`)
+    if (reqs  > 0) parts.push(`${reqs} request${reqs > 1 ? 's' : ''}`)
+    return { text: parts.join(' · '), green: reqs > 0 }
+  }
 
   return (
     <div className={`w-[240px] flex-shrink-0 border-l border-white/5 flex flex-col overflow-hidden ${className}`}>
@@ -99,6 +147,7 @@ export default function FriendsDmPanel({ selected, onSelect, className = '' }) {
             <div className="py-1">
               {friends.map(f => {
                 const active = isFriendSelected(f)
+                const sub    = friendSubtitle(f)
                 return (
                   <button
                     key={f.id}
@@ -116,7 +165,11 @@ export default function FriendsDmPanel({ selected, onSelect, className = '' }) {
                       <p className={`text-sm font-medium truncate ${active ? 'text-white' : 'text-[#B3B3B3]'}`}>
                         {f.displayName}
                       </p>
-                      <p className="text-[#535353] text-xs truncate">@{f.username}</p>
+                      <p className={`text-xs truncate ${
+                        sub.green ? 'text-[#1DB954] font-semibold' : sub.muted ? 'text-[#535353]' : 'text-[#B3B3B3]'
+                      }`}>
+                        {sub.text}
+                      </p>
                     </div>
                     {active && <div className="w-1.5 h-1.5 rounded-full bg-[#1DB954] flex-shrink-0" />}
                   </button>
@@ -137,6 +190,7 @@ export default function FriendsDmPanel({ selected, onSelect, className = '' }) {
             <div className="py-1">
               {groups.map(g => {
                 const active = isGroupSelected(g)
+                const sub    = groupSubtitle(g)
                 return (
                   <button
                     key={g.id}
@@ -154,8 +208,10 @@ export default function FriendsDmPanel({ selected, onSelect, className = '' }) {
                       <p className={`text-sm font-medium truncate ${active ? 'text-white' : 'text-[#B3B3B3]'}`}>
                         {g.name}
                       </p>
-                      <p className="text-[#535353] text-xs">
-                        {g.memberCount ?? g._count?.members ?? 0} members
+                      <p className={`text-xs truncate ${
+                        sub.green ? 'text-[#1DB954] font-semibold' : sub.muted ? 'text-[#535353]' : 'text-[#B3B3B3]'
+                      }`}>
+                        {sub.text}
                       </p>
                     </div>
                     {active && <div className="w-1.5 h-1.5 rounded-full bg-purple-400 flex-shrink-0" />}

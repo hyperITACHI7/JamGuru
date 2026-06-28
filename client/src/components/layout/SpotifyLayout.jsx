@@ -1,9 +1,50 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useLocation } from 'react-router-dom'
 import Sidebar from './Sidebar'
 import NowPlayingBar from './NowPlayingBar'
 import MobileBottomNav from './MobileBottomNav'
 import { usePlayer } from '../../context/PlayerContext'
+
+const API_BASE = import.meta.env.VITE_API_URL ?? ''
+const SSE_EVENTS = ['new_dm_rec', 'new_dm_req', 'new_group_activity']
+
+function useSseConnection() {
+  const esRef = useRef(null)
+
+  useEffect(() => {
+    const token = localStorage.getItem('token')
+    if (!token) return
+
+    let retryTimer = null
+
+    function connect() {
+      const es = new EventSource(`${API_BASE}/api/events?token=${encodeURIComponent(token)}`)
+      esRef.current = es
+
+      SSE_EVENTS.forEach(type => {
+        es.addEventListener(type, e => {
+          window.dispatchEvent(new CustomEvent('jam:sse', {
+            detail: { type, ...JSON.parse(e.data) },
+          }))
+        })
+      })
+
+      es.onerror = () => {
+        es.close()
+        if (localStorage.getItem('token')) {
+          retryTimer = setTimeout(connect, 5000)
+        }
+      }
+    }
+
+    connect()
+
+    return () => {
+      clearTimeout(retryTimer)
+      esRef.current?.close()
+    }
+  }, [])
+}
 
 function useIsMobile() {
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768)
@@ -20,6 +61,7 @@ export default function SpotifyLayout({ children }) {
   const { track } = usePlayer()
   const isMobile = useIsMobile()
   const location = useLocation()
+  useSseConnection()
 
   // Mobile layout — no sidebar, bottom nav only on home
   if (isMobile) {

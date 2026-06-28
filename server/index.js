@@ -2,6 +2,8 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const jwt = require('jsonwebtoken');
+const { addConnection, removeConnection } = require('./sse');
 
 const authRoutes        = require('./routes/auth');
 const spotifyAuthRoutes = require('./routes/spotifyAuth');
@@ -46,6 +48,37 @@ app.use('/api/playlists',       playlistRoutes);
 app.use('/api/song-requests',   songRequestRoutes);
 
 app.get('/api/health', (_req, res) => res.json({ status: 'ok' }));
+
+// SSE endpoint — auth via ?token= query param (EventSource cannot set headers)
+app.get('/api/events', (req, res) => {
+  const token = req.query.token;
+  if (!token) return res.status(401).json({ error: 'No token provided' });
+
+  let userId;
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    userId = decoded.userId;
+  } catch {
+    return res.status(401).json({ error: 'Invalid or expired token' });
+  }
+
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders();
+
+  addConnection(userId, res);
+
+  const ping = setInterval(() => {
+    try { res.write(':ping\n\n'); }
+    catch (_) { clearInterval(ping); }
+  }, 25000);
+
+  req.on('close', () => {
+    clearInterval(ping);
+    removeConnection(userId, res);
+  });
+});
 
 scheduleMonthlyReset();
 

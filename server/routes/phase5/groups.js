@@ -2,6 +2,7 @@ const express = require('express');
 const { PrismaClient } = require('@prisma/client');
 const auth = require('../../middleware/auth');
 const { recomputeGroupScore, todayDate } = require('../../services/phase5/groupScoring');
+const { notifyMany } = require('../../sse');
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -184,6 +185,13 @@ router.post('/:id/recommendations', auth, async (req, res) => {
       });
     }
 
+    // Notify other group members
+    const otherMembers = await prisma.groupMember.findMany({
+      where: { groupId: req.params.id, userId: { not: req.userId } },
+      select: { userId: true },
+    });
+    notifyMany(otherMembers.map(m => m.userId), 'new_group_activity', { groupId: req.params.id });
+
     // Update group score — increment recsSent
     const today = todayDate();
     await prisma.groupScore.upsert({
@@ -222,6 +230,14 @@ router.post('/:id/requests', auth, async (req, res) => {
     const request = await prisma.groupSongRequest.create({
       data: { groupId: req.params.id, senderId: req.userId, templateId, variables, renderedText, status: 'OPEN' },
     });
+
+    // Notify other group members
+    const otherMembers = await prisma.groupMember.findMany({
+      where: { groupId: req.params.id, userId: { not: req.userId } },
+      select: { userId: true },
+    });
+    notifyMany(otherMembers.map(m => m.userId), 'new_group_activity', { groupId: req.params.id });
+
     res.status(201).json(request);
   } catch (e) {
     console.error(e);
