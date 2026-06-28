@@ -124,22 +124,24 @@ function GroupMessage({ msg, onLikeToggle, requestText }) {
                   {playing ? <Pause size={10} fill="currentColor" /> : <Play size={10} fill="currentColor" />}
                 </button>
               )}
-              <button
-                onClick={() => !anyReaction && onLikeToggle(msg)}
-                disabled={anyReaction}
-                className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${
-                  msg.liked ? 'text-purple-400 hover:text-red-400'
-                    : anyReaction ? 'text-[#333] cursor-not-allowed'
-                    : 'text-[#B3B3B3] hover:text-white'
-                }`}
-              >
-                <Heart size={14} fill={msg.liked ? 'currentColor' : 'none'} />
-              </button>
-              {msg.likeCount > 0 && (
-                <span className={`text-[9px] font-medium -mt-1 ${msg.liked ? 'text-purple-400' : 'text-[#B3B3B3]'}`}>
-                  {msg.likeCount}
-                </span>
-              )}
+              <div className="flex items-center gap-1">
+                {msg.likeCount > 0 && (
+                  <span className={`text-[9px] font-medium ${msg.liked ? 'text-purple-400' : 'text-[#B3B3B3]'}`}>
+                    {msg.likeCount}
+                  </span>
+                )}
+                <button
+                  onClick={() => !anyReaction && onLikeToggle(msg)}
+                  disabled={anyReaction}
+                  className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${
+                    msg.liked ? 'text-purple-400 hover:text-red-400'
+                      : anyReaction ? 'text-[#333] cursor-not-allowed'
+                      : 'text-[#B3B3B3] hover:text-white'
+                  }`}
+                >
+                  <Heart size={14} fill={msg.liked ? 'currentColor' : 'none'} />
+                </button>
+              </div>
             </div>
           ) : (
             msg.song.previewUrl && (
