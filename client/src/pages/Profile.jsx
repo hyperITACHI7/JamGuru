@@ -414,6 +414,127 @@ export default function Profile() {
             </div>
           )}
 
+          {/* Taste profile — display */}
+          {hasTaste && !editingTaste && (
+            <div>
+              <div className="flex items-center gap-3 mb-3">
+                <h2 className="text-white font-bold text-xl">Taste Profile</h2>
+                {taste.updatedAt && (
+                  <span className="text-[#535353] text-xs">
+                    Updated {new Date(taste.updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                  </span>
+                )}
+              </div>
+              <div className="bg-[#181818] rounded-xl p-4 space-y-3">
+                <TasteSection label="Genres"  tags={taste.genres}  pinned={taste.pinned} />
+                <TasteSection label="Moods"   tags={taste.moods}   pinned={taste.pinned} />
+                <TasteSection label="Artists" tags={taste.artists} pinned={taste.pinned} />
+                <TasteSection label="Era"     tags={taste.eras}    pinned={taste.pinned} />
+                <p className="text-[#535353] text-[10px] pt-1">
+                  <Sparkles size={9} className="inline mr-1" />AI-suggested · click "Edit taste" to personalise
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Taste profile — not yet generated */}
+          {!hasTaste && isOwnProfile && !editingTaste && (
+            <div className="bg-[#181818] rounded-xl p-4">
+              <p className="text-[#B3B3B3] text-sm mb-3">
+                No taste profile yet. Sync your Spotify liked songs or set it manually.
+              </p>
+              <button
+                onClick={handleTasteRefresh}
+                disabled={refreshingTaste}
+                className="flex items-center gap-2 text-[#1DB954] text-sm font-semibold hover:underline disabled:opacity-50"
+              >
+                <RefreshCw size={13} className={refreshingTaste ? 'animate-spin' : ''} />
+                {refreshingTaste ? 'Analysing…' : 'Generate with AI'}
+              </button>
+            </div>
+          )}
+
+          {/* Taste profile — edit form */}
+          {editingTaste && isOwnProfile && (
+            <div className="bg-[#282828] rounded-xl p-5 space-y-5 max-w-lg">
+              <div className="flex items-center justify-between">
+                <h2 className="text-white font-bold">Edit taste profile</h2>
+                <button
+                  onClick={handleTasteRefresh}
+                  disabled={refreshingTaste}
+                  className="flex items-center gap-1.5 text-[#1DB954] text-xs font-semibold hover:underline disabled:opacity-50"
+                >
+                  <RefreshCw size={11} className={refreshingTaste ? 'animate-spin' : ''} />
+                  {refreshingTaste ? 'Analysing…' : 'Refresh with AI'}
+                </button>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[#B3B3B3] text-xs font-semibold uppercase tracking-wider">Genres</label>
+                <ChipToggle
+                  options={GENRE_OPTIONS}
+                  selected={tasteForm.genres}
+                  onChange={v => setTasteForm(f => ({ ...f, genres: v }))}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[#B3B3B3] text-xs font-semibold uppercase tracking-wider">Moods</label>
+                <ChipToggle
+                  options={MOOD_OPTIONS}
+                  selected={tasteForm.moods}
+                  onChange={v => setTasteForm(f => ({ ...f, moods: v }))}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[#B3B3B3] text-xs font-semibold uppercase tracking-wider">Artists</label>
+                <input
+                  value={artistInput}
+                  onChange={e => setArtistInput(e.target.value)}
+                  placeholder="The Weeknd, SZA, Kendrick Lamar…"
+                  className="w-full bg-[#3E3E3E] text-white px-3 py-2.5 rounded-md border border-transparent focus:outline-none focus:border-[#1DB954] transition-colors placeholder-[#6a6a6a] text-sm"
+                />
+                <p className="text-[#535353] text-xs">Comma-separated</p>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[#B3B3B3] text-xs font-semibold uppercase tracking-wider">Era</label>
+                <ChipToggle
+                  options={ERA_OPTIONS}
+                  selected={tasteForm.eras}
+                  onChange={v => setTasteForm(f => ({ ...f, eras: v }))}
+                />
+              </div>
+
+              <button
+                onClick={handleTasteSave}
+                disabled={tasteSaving}
+                className="bg-white text-black font-bold px-6 py-2 rounded-full hover:scale-[1.02] transition-transform disabled:opacity-50"
+              >
+                {tasteSaving ? 'Saving…' : 'Save taste profile'}
+              </button>
+            </div>
+          )}
+
+          {/* JamGuru badge */}
+          <div>
+            <h2 className="text-white font-bold text-xl mb-4">JamGuru</h2>
+            <div className="flex items-center gap-4 bg-[#181818] hover:bg-[#282828] transition-colors rounded-xl p-4 max-w-sm">
+              <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-[#1DB954] to-emerald-700 flex items-center justify-center flex-shrink-0">
+                <Crown size={24} className="text-black fill-black" />
+              </div>
+              <div>
+                <p className="text-white font-semibold">
+                  JamGuru for{' '}
+                  <span className="text-[#1DB954]">{user.jamGuruForCount ?? 0}</span>{' '}
+                  listener{user.jamGuruForCount !== 1 ? 's' : ''}
+                </p>
+                <p className="text-[#B3B3B3] text-xs mt-0.5">This month's recommendations</p>
+              </div>
+            </div>
+          </div>
+
           {/* Friends & Groups — own profile only */}
           {isOwnProfile && (
             <div className="space-y-6">
@@ -577,127 +698,6 @@ export default function Profile() {
 
             </div>
           )}
-
-          {/* Taste profile — display */}
-          {hasTaste && !editingTaste && (
-            <div>
-              <div className="flex items-center gap-3 mb-3">
-                <h2 className="text-white font-bold text-xl">Taste Profile</h2>
-                {taste.updatedAt && (
-                  <span className="text-[#535353] text-xs">
-                    Updated {new Date(taste.updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                  </span>
-                )}
-              </div>
-              <div className="bg-[#181818] rounded-xl p-4 space-y-3">
-                <TasteSection label="Genres"  tags={taste.genres}  pinned={taste.pinned} />
-                <TasteSection label="Moods"   tags={taste.moods}   pinned={taste.pinned} />
-                <TasteSection label="Artists" tags={taste.artists} pinned={taste.pinned} />
-                <TasteSection label="Era"     tags={taste.eras}    pinned={taste.pinned} />
-                <p className="text-[#535353] text-[10px] pt-1">
-                  <Sparkles size={9} className="inline mr-1" />AI-suggested · click "Edit taste" to personalise
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* Taste profile — not yet generated */}
-          {!hasTaste && isOwnProfile && !editingTaste && (
-            <div className="bg-[#181818] rounded-xl p-4">
-              <p className="text-[#B3B3B3] text-sm mb-3">
-                No taste profile yet. Sync your Spotify liked songs or set it manually.
-              </p>
-              <button
-                onClick={handleTasteRefresh}
-                disabled={refreshingTaste}
-                className="flex items-center gap-2 text-[#1DB954] text-sm font-semibold hover:underline disabled:opacity-50"
-              >
-                <RefreshCw size={13} className={refreshingTaste ? 'animate-spin' : ''} />
-                {refreshingTaste ? 'Analysing…' : 'Generate with AI'}
-              </button>
-            </div>
-          )}
-
-          {/* Taste profile — edit form */}
-          {editingTaste && isOwnProfile && (
-            <div className="bg-[#282828] rounded-xl p-5 space-y-5 max-w-lg">
-              <div className="flex items-center justify-between">
-                <h2 className="text-white font-bold">Edit taste profile</h2>
-                <button
-                  onClick={handleTasteRefresh}
-                  disabled={refreshingTaste}
-                  className="flex items-center gap-1.5 text-[#1DB954] text-xs font-semibold hover:underline disabled:opacity-50"
-                >
-                  <RefreshCw size={11} className={refreshingTaste ? 'animate-spin' : ''} />
-                  {refreshingTaste ? 'Analysing…' : 'Refresh with AI'}
-                </button>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-[#B3B3B3] text-xs font-semibold uppercase tracking-wider">Genres</label>
-                <ChipToggle
-                  options={GENRE_OPTIONS}
-                  selected={tasteForm.genres}
-                  onChange={v => setTasteForm(f => ({ ...f, genres: v }))}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-[#B3B3B3] text-xs font-semibold uppercase tracking-wider">Moods</label>
-                <ChipToggle
-                  options={MOOD_OPTIONS}
-                  selected={tasteForm.moods}
-                  onChange={v => setTasteForm(f => ({ ...f, moods: v }))}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-[#B3B3B3] text-xs font-semibold uppercase tracking-wider">Artists</label>
-                <input
-                  value={artistInput}
-                  onChange={e => setArtistInput(e.target.value)}
-                  placeholder="The Weeknd, SZA, Kendrick Lamar…"
-                  className="w-full bg-[#3E3E3E] text-white px-3 py-2.5 rounded-md border border-transparent focus:outline-none focus:border-[#1DB954] transition-colors placeholder-[#6a6a6a] text-sm"
-                />
-                <p className="text-[#535353] text-xs">Comma-separated</p>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-[#B3B3B3] text-xs font-semibold uppercase tracking-wider">Era</label>
-                <ChipToggle
-                  options={ERA_OPTIONS}
-                  selected={tasteForm.eras}
-                  onChange={v => setTasteForm(f => ({ ...f, eras: v }))}
-                />
-              </div>
-
-              <button
-                onClick={handleTasteSave}
-                disabled={tasteSaving}
-                className="bg-white text-black font-bold px-6 py-2 rounded-full hover:scale-[1.02] transition-transform disabled:opacity-50"
-              >
-                {tasteSaving ? 'Saving…' : 'Save taste profile'}
-              </button>
-            </div>
-          )}
-
-          {/* JamGuru badge */}
-          <div>
-            <h2 className="text-white font-bold text-xl mb-4">JamGuru</h2>
-            <div className="flex items-center gap-4 bg-[#181818] hover:bg-[#282828] transition-colors rounded-xl p-4 max-w-sm">
-              <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-[#1DB954] to-emerald-700 flex items-center justify-center flex-shrink-0">
-                <Crown size={24} className="text-black fill-black" />
-              </div>
-              <div>
-                <p className="text-white font-semibold">
-                  JamGuru for{' '}
-                  <span className="text-[#1DB954]">{user.jamGuruForCount ?? 0}</span>{' '}
-                  listener{user.jamGuruForCount !== 1 ? 's' : ''}
-                </p>
-                <p className="text-[#B3B3B3] text-xs mt-0.5">This month's recommendations</p>
-              </div>
-            </div>
-          </div>
 
           {/* Member since */}
           <p className="text-[#6a6a6a] text-xs">
