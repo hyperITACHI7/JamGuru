@@ -228,10 +228,15 @@ export default function GroupConversationView({ group, onBack }) {
   const [replySearchLoading, setReplySearchLoading] = useState(false)
   const [activeRequestText, setActiveRequestText]   = useState('')
 
+  // Library Spotify search
+  const [librarySearchResults, setLibrarySearchResults] = useState([])
+  const [librarySearchLoading, setLibrarySearchLoading] = useState(false)
+
   const bottomRef      = useRef(null)
   const searchRef      = useRef(null)
   const replySearchRef = useRef(null)
   const replySearchTimer = useRef(null)
+  const librarySearchTimer = useRef(null)
 
   function loadFeed() {
     return getGroupFeed(group.id)
@@ -260,21 +265,30 @@ export default function GroupConversationView({ group, onBack }) {
     if (!loading) bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [loading, messages.length])
 
-  useEffect(() => {
-    if (showLibrary) setTimeout(() => searchRef.current?.focus(), 50)
-  }, [showLibrary, libraryView])
-
-  useEffect(() => {
-    if (showReplyPicker) setTimeout(() => replySearchRef.current?.focus(), 80)
-  }, [showReplyPicker])
 
   // ── Library picker ──────────────────────────────────────────
+  function handleLibrarySearchChange(q) {
+    setLibrarySearch(q)
+    setLibrarySearchResults([])
+    if (!q.trim()) return
+    clearTimeout(librarySearchTimer.current)
+    librarySearchTimer.current = setTimeout(async () => {
+      setLibrarySearchLoading(true)
+      try {
+        const { data } = await searchSongs(q)
+        setLibrarySearchResults(data.tracks || [])
+      } catch (_) {}
+      setLibrarySearchLoading(false)
+    }, 400)
+  }
+
   async function openLibrary() {
     setShowRequest(false)
     setShowReplyPicker(false)
     setShowLibrary(true)
     setLibraryView('playlists')
     setLibrarySearch('')
+    setLibrarySearchResults([])
     setActivePlaylist(null)
     setLibrarySongs([])
     if (playlists.length === 0) {
@@ -301,25 +315,17 @@ export default function GroupConversationView({ group, onBack }) {
   }
 
   function backToPlaylists() {
-    setLibraryView('playlists'); setLibrarySearch(''); setActivePlaylist(null); setLibrarySongs([])
+    setLibraryView('playlists'); setLibrarySearch(''); setLibrarySearchResults([]); setActivePlaylist(null); setLibrarySongs([])
   }
 
   function selectSong(song) {
     setSuggested({ song }); setSuggestNote(''); setSuggestError('')
     setShowLibrary(false); setShowReplyPicker(false)
-    setLibrarySearch(''); setLibraryView('playlists')
+    setLibrarySearch(''); setLibrarySearchResults([]); setLibraryView('playlists')
     setReplySearch(''); setReplySearchResults([])
   }
 
-  const filteredLibrary = librarySearch.trim()
-    ? (libraryView === 'playlists'
-        ? playlists.filter(p => p.name.toLowerCase().includes(librarySearch.toLowerCase()))
-        : librarySongs.filter(s =>
-            s.title.toLowerCase().includes(librarySearch.toLowerCase()) ||
-            s.artist.toLowerCase().includes(librarySearch.toLowerCase())
-          )
-      )
-    : (libraryView === 'playlists' ? playlists : librarySongs)
+  const filteredLibrary = libraryView === 'playlists' ? playlists : librarySongs
 
   // ── Reply picker ────────────────────────────────────────────
   async function handlePickSongForRequest(requestId, requestText) {
@@ -653,18 +659,41 @@ export default function GroupConversationView({ group, onBack }) {
             )}
             <div className="flex-1 flex items-center gap-2 bg-[#282828] rounded-full px-3 py-1.5">
               <Search size={12} className="text-[#535353] flex-shrink-0" />
-              <input ref={searchRef} value={librarySearch} onChange={e => setLibrarySearch(e.target.value)}
-                placeholder={libraryView === 'playlists' ? 'Search playlists…' : `Search in ${activePlaylist?.name}…`}
+              <input ref={searchRef} value={librarySearch} onChange={e => handleLibrarySearchChange(e.target.value)}
+                placeholder="Search Spotify…"
                 className="flex-1 bg-transparent text-white text-xs focus:outline-none placeholder-[#535353]" />
               {librarySearch && (
-                <button onClick={() => setLibrarySearch('')} className="text-[#535353] hover:text-white"><X size={11} /></button>
+                <button onClick={() => { setLibrarySearch(''); setLibrarySearchResults([]) }} className="text-[#535353] hover:text-white"><X size={11} /></button>
               )}
             </div>
             <button onClick={() => { setShowLibrary(false); setPendingGroupRequestId(null) }}
               className="text-[#535353] hover:text-white transition-colors flex-shrink-0"><X size={16} /></button>
           </div>
 
-          {libraryView === 'playlists' ? (
+          {librarySearch.trim() ? (
+            /* ── Spotify search results ── */
+            <div className="overflow-y-auto flex-1">
+              {librarySearchLoading
+                ? <div className="flex items-center justify-center py-8"><div className="w-5 h-5 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" /></div>
+                : librarySearchResults.length === 0
+                  ? <p className="text-center text-[#535353] text-xs py-8">No results</p>
+                  : librarySearchResults.map(song => (
+                      <button key={song.spotifyId} onClick={() => selectSong(song)}
+                        className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/5 transition-colors text-left">
+                        <div className="w-9 h-9 flex-shrink-0 rounded-md overflow-hidden bg-[#282828]">
+                          {song.albumArtUrl ? <img src={song.albumArtUrl} alt={song.title} className="w-full h-full object-cover" />
+                            : <div className="w-full h-full flex items-center justify-center"><Music size={12} className="text-[#535353]" /></div>}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-white text-xs font-medium truncate">{song.title}</p>
+                          <p className="text-[#B3B3B3] text-[10px] truncate mt-0.5">{song.artist}</p>
+                        </div>
+                      </button>
+                    ))
+              }
+            </div>
+          ) : libraryView === 'playlists' ? (
+            /* ── Playlist browser ── */
             <div className="overflow-y-auto flex-1">
               {playlistsLoading
                 ? <div className="flex items-center justify-center py-8"><div className="w-5 h-5 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" /></div>
@@ -702,11 +731,12 @@ export default function GroupConversationView({ group, onBack }) {
                 )}
             </div>
           ) : (
+            /* ── Songs inside a playlist ── */
             <div className="overflow-y-auto flex-1">
               {libraryLoading
                 ? <div className="flex items-center justify-center py-8"><div className="w-5 h-5 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" /></div>
                 : filteredLibrary.length === 0
-                  ? <p className="text-center text-[#535353] text-xs py-8">{librarySearch ? 'No songs match' : 'This playlist is empty'}</p>
+                  ? <p className="text-center text-[#535353] text-xs py-8">This playlist is empty</p>
                   : filteredLibrary.map(song => (
                       <button key={song.spotifyId} onClick={() => selectSong(song)}
                         className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/5 transition-colors text-left">
