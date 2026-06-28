@@ -25,7 +25,7 @@ export default function SpotifyLayout({ children }) {
   if (isMobile) {
     const isHome = location.pathname === '/'
     return (
-      <div className="h-screen flex flex-col bg-black overflow-hidden">
+      <div className="h-[100dvh] flex flex-col bg-black overflow-hidden">
         <main className="flex-1 bg-[#121212] overflow-hidden flex flex-col min-h-0">
           {children}
         </main>
