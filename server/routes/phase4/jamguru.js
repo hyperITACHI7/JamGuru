@@ -15,7 +15,7 @@ router.get('/jamguru/mine', auth, async (req, res) => {
 
     const top = await prisma.personalTrustRanking.findFirst({
       where: { ownerId: req.userId, month, trustScore: { gt: 0 } },
-      orderBy: { trustScore: 'desc' },
+      orderBy: [{ trustScore: 'desc' }, { likesGiven: 'desc' }],
       include: { friend: { select: SAFE_USER } },
     });
 
@@ -46,7 +46,7 @@ router.get('/jamguru/count', auth, async (req, res) => {
     for (const row of meAsJamguru) {
       const top = await prisma.personalTrustRanking.findFirst({
         where: { ownerId: row.ownerId, month },
-        orderBy: { trustScore: 'desc' },
+        orderBy: [{ trustScore: 'desc' }, { likesGiven: 'desc' }],
       });
       if (top?.friendId === req.userId) count++;
     }

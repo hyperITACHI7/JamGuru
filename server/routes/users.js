@@ -74,7 +74,7 @@ router.get('/:username', async (req, res) => {
     // Their JamGuru: the friend they trust most this month
     const topTrust = await prisma.personalTrustRanking.findFirst({
       where: { ownerId: user.id, month, trustScore: { gt: 0 } },
-      orderBy: { trustScore: 'desc' },
+      orderBy: [{ trustScore: 'desc' }, { likesGiven: 'desc' }],
       include: { friend: { select: { id: true, username: true, displayName: true } } },
     });
     const myJamGuru = topTrust?.friend ?? null;
@@ -89,7 +89,7 @@ router.get('/:username', async (req, res) => {
       candidateOwners.map(async ({ ownerId }) => {
         const top = await prisma.personalTrustRanking.findFirst({
           where: { ownerId, month },
-          orderBy: { trustScore: 'desc' },
+          orderBy: [{ trustScore: 'desc' }, { likesGiven: 'desc' }],
         });
         if (top?.friendId === user.id) jamGuruForCount++;
       })
