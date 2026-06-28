@@ -127,15 +127,19 @@ function GroupMessage({ msg, onLikeToggle, requestText }) {
               <button
                 onClick={() => !anyReaction && onLikeToggle(msg)}
                 disabled={anyReaction}
-                className={`flex flex-col items-center gap-0.5 transition-colors ${
+                className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${
                   msg.liked ? 'text-purple-400 hover:text-red-400'
                     : anyReaction ? 'text-[#333] cursor-not-allowed'
                     : 'text-[#B3B3B3] hover:text-white'
                 }`}
               >
                 <Heart size={14} fill={msg.liked ? 'currentColor' : 'none'} />
-                {msg.likeCount > 0 && <span className="text-[9px] font-medium leading-none">{msg.likeCount}</span>}
               </button>
+              {msg.likeCount > 0 && (
+                <span className={`text-[9px] font-medium -mt-1 ${msg.liked ? 'text-purple-400' : 'text-[#B3B3B3]'}`}>
+                  {msg.likeCount}
+                </span>
+              )}
             </div>
           ) : (
             msg.song.previewUrl && (
