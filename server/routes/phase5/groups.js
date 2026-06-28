@@ -120,7 +120,11 @@ router.get('/:id', auth, async (req, res) => {
     });
     if (!group) return res.status(404).json({ error: 'Group not found' });
 
-    res.json(group);
+    res.json({
+      ...group,
+      creator: group.creator ?? { id: null, displayName: 'Deleted user', username: null, avatarUrl: null },
+      members: (group.members ?? []).filter(m => m.user),
+    });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'Server error' });
