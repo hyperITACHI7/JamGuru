@@ -49,6 +49,7 @@ function ScoreWidget({ groupId }) {
 function MemberList({ group, onMemberRemoved }) {
   const currentUser = me()
   const isCreator   = group.createdBy === currentUser.id
+  const members     = group.members ?? []
 
   async function handleRemove(userId) {
     try {
@@ -62,10 +63,10 @@ function MemberList({ group, onMemberRemoved }) {
   return (
     <div className="mb-6">
       <p className="text-[#B3B3B3] text-[11px] font-bold uppercase tracking-widest mb-3">
-        Members · {group.members.length}
+        Members · {members.length}
       </p>
       <div className="flex flex-wrap gap-2">
-        {group.members.map(m => (
+        {members.map(m => (
           <div
             key={m.userId}
             className="flex items-center gap-2 bg-[#282828] rounded-full pl-1 pr-3 py-1"
@@ -108,7 +109,7 @@ function AddMemberPanel({ group, onAdded }) {
   const [busy, setBusy]     = useState(false)
   const [error, setError]   = useState('')
 
-  const memberIds = new Set(group.members.map(m => m.userId))
+  const memberIds = new Set((group.members ?? []).map(m => m.userId))
 
   useEffect(() => {
     if (query.trim().length < 2) { setRes([]); return }
@@ -291,7 +292,7 @@ export default function GroupDetail() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full">
+      <div className="flex-1 flex items-center justify-center min-h-0">
         <p className="text-[#B3B3B3]">Loading…</p>
       </div>
     )
@@ -299,7 +300,7 @@ export default function GroupDetail() {
 
   if (!group) {
     return (
-      <div className="flex flex-col items-center justify-center h-full gap-4">
+      <div className="flex-1 flex flex-col items-center justify-center gap-4 min-h-0">
         <p className="text-white font-semibold">Group not found</p>
         <Link to="/groups" className="text-[#1DB954] text-sm hover:underline">← Back to Groups</Link>
       </div>
@@ -308,8 +309,11 @@ export default function GroupDetail() {
 
   const tabs = ['feed', 'members', ...(isCreator ? ['settings'] : [])]
 
+  const members = group.members ?? []
+  const creatorName = group.creator?.displayName ?? 'Unknown'
+
   return (
-    <div className="flex flex-col h-full overflow-hidden">
+    <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
       <div className="relative flex-shrink-0">
         <div className="absolute inset-0 bg-gradient-to-b from-purple-900/60 via-[#121212]/60 to-transparent pointer-events-none" />
         <TopBar transparent />
@@ -335,7 +339,7 @@ export default function GroupDetail() {
             </div>
             <h1 className="text-white font-black text-3xl mb-1 truncate">{group.name}</h1>
             <p className="text-[#B3B3B3] text-sm">
-              {group.members.length} member{group.members.length !== 1 ? 's' : ''} · Created by {group.creator.displayName}
+              {members.length} member{members.length !== 1 ? 's' : ''} · Created by {creatorName}
             </p>
           </div>
         </div>
