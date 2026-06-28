@@ -386,19 +386,23 @@ router.get('/:id/feed', auth, async (req, res) => {
       }),
     ]);
 
+    const DELETED_USER = { id: null, displayName: 'Deleted user', username: null, avatarUrl: null };
+
     const combined = [
-      ...recs.map(r => ({
-        type: 'recommendation',
-        id: r.id, sentAt: r.sentAt, context: r.context,
-        song: r.song, sender: r.sender,
-        liked: r.likes.length > 0, likeId: r.likes[0]?.id ?? null,
-        likeCount: r._count.likes,
-        groupRequestId: r.groupRequestId ?? null,
-      })),
+      ...recs
+        .filter(r => r.song)
+        .map(r => ({
+          type: 'recommendation',
+          id: r.id, sentAt: r.sentAt, context: r.context,
+          song: r.song, sender: r.sender ?? DELETED_USER,
+          liked: r.likes.length > 0, likeId: r.likes[0]?.id ?? null,
+          likeCount: r._count.likes,
+          groupRequestId: r.groupRequestId ?? null,
+        })),
       ...requests.map(r => ({
         type: 'request',
         id: r.id, sentAt: r.sentAt,
-        sender: r.sender, senderId: r.senderId,
+        sender: r.sender ?? DELETED_USER, senderId: r.senderId,
         templateId: r.templateId, variables: r.variables,
         renderedText: r.renderedText, status: r.status,
       })),

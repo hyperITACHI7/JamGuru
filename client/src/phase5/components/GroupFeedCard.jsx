@@ -19,6 +19,8 @@ export default function GroupFeedCard({ rec, groupId, onLikeChange }) {
   const [likeCount, setCount] = useState(rec.likeCount)
   const [busy, setBusy]       = useState(false)
   const player   = usePlayer()
+  const song     = rec.song ?? {}
+  const sender   = rec.sender ?? { displayName: 'Deleted user' }
   const isActive = player.isActive(rec.song)
   const playing  = isActive && player.playing
 
@@ -51,11 +53,11 @@ export default function GroupFeedCard({ rec, groupId, onLikeChange }) {
     <div className="bg-[#1a1a1a] rounded-xl p-4 flex gap-4 group hover:bg-[#222] transition-colors">
       {/* Album art */}
       <div className="w-14 h-14 rounded-lg overflow-hidden bg-[#333] flex-shrink-0 relative">
-        {rec.song.albumArtUrl
-          ? <img src={rec.song.albumArtUrl} alt={rec.song.album} className="w-full h-full object-cover" />
+        {song.albumArtUrl
+          ? <img src={song.albumArtUrl} alt={song.album} className="w-full h-full object-cover" />
           : <div className="w-full h-full flex items-center justify-center"><Music size={20} className="text-[#B3B3B3]" /></div>
         }
-        {rec.song.previewUrl && (
+        {song.previewUrl && (
           <button
             onClick={togglePlay}
             className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity"
@@ -70,13 +72,13 @@ export default function GroupFeedCard({ rec, groupId, onLikeChange }) {
 
       {/* Content */}
       <div className="flex-1 min-w-0">
-        <p className="text-white font-semibold text-sm truncate">{rec.song.title}</p>
-        <p className="text-[#B3B3B3] text-xs truncate mb-1">{rec.song.artist}</p>
+        <p className="text-white font-semibold text-sm truncate">{song.title}</p>
+        <p className="text-[#B3B3B3] text-xs truncate mb-1">{song.artist}</p>
 
         {/* Sender */}
         <div className="flex items-center gap-1.5 mb-1">
-          <Avatar name={rec.sender.displayName} size={5} />
-          <span className="text-[#B3B3B3] text-xs">{rec.sender.displayName}</span>
+          <Avatar name={sender.displayName} size={5} />
+          <span className="text-[#B3B3B3] text-xs">{sender.displayName}</span>
         </div>
 
         {rec.context && (
