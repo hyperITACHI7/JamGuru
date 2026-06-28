@@ -1,12 +1,12 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { Crown, Sparkles, RefreshCw, UserPlus, UserCheck } from 'lucide-react'
+import { Crown, Sparkles, RefreshCw, UserPlus, UserCheck, Users, Search, Check, X } from 'lucide-react'
 import TopBar from '../components/layout/TopBar'
-import FindFriendsSheet from '../components/FindFriendsSheet'
 import { getMe } from '../api/auth'
 import { getProfile, updateProfile } from '../api/users'
 import { getTaste, getTasteByUser, updateTaste, refreshTaste } from '../api/taste'
-import { sendFriendRequest } from '../phase3/api/friends'
+import { getFriends, getFriendRequests, acceptFriendRequest, sendFriendRequest, searchUsers } from '../phase3/api/friends'
+import { getGroups } from '../phase5/api/groups'
 
 const GENRE_OPTIONS = [
   'hip-hop', 'r&b', 'pop', 'rock', 'indie', 'electronic',
@@ -85,25 +85,35 @@ export default function Profile() {
   const { username } = useParams()
   const navigate = useNavigate()
 
-  const [user, setUser]               = useState(null)
+  const [user, setUser]                 = useState(null)
   const [isOwnProfile, setIsOwnProfile] = useState(false)
   const [friendStatus, setFriendStatus] = useState(null)
   const [addingFriend, setAddingFriend] = useState(false)
-  const [showFindFriends, setShowFindFriends] = useState(false)
-  const [editing, setEditing]         = useState(false)
-  const [form, setForm]               = useState({ displayName: '', bio: '' })
-  const [loading, setLoading]         = useState(true)
-  const [saving, setSaving]           = useState(false)
-  const [pageError, setPageError]     = useState('')
-  const [saveError, setSaveError]     = useState('')
+  const [editing, setEditing]           = useState(false)
+  const [form, setForm]                 = useState({ displayName: '', bio: '' })
+  const [loading, setLoading]           = useState(true)
+  const [saving, setSaving]             = useState(false)
+  const [pageError, setPageError]       = useState('')
+  const [saveError, setSaveError]       = useState('')
 
   // Taste profile state
-  const [taste, setTaste]             = useState(null)
+  const [taste, setTaste]               = useState(null)
   const [editingTaste, setEditingTaste] = useState(false)
-  const [tasteForm, setTasteForm]     = useState({ genres: [], moods: [], artists: [], eras: [] })
-  const [artistInput, setArtistInput] = useState('')
+  const [tasteForm, setTasteForm]       = useState({ genres: [], moods: [], artists: [], eras: [] })
+  const [artistInput, setArtistInput]   = useState('')
   const [refreshingTaste, setRefreshingTaste] = useState(false)
-  const [tasteSaving, setTasteSaving] = useState(false)
+  const [tasteSaving, setTasteSaving]   = useState(false)
+
+  // Social state (own profile only)
+  const [friends, setFriends]           = useState([])
+  const [requests, setRequests]         = useState([])
+  const [groups, setGroups]             = useState([])
+  const [friendSearch, setFriendSearch] = useState('')
+  const [friendSearchResults, setFriendSearchResults] = useState([])
+  const [friendSearching, setFriendSearching]         = useState(false)
+  const [friendStatuses, setFriendStatuses]           = useState({})
+  const [acceptingId, setAcceptingId]                 = useState(null)
+  const friendSearchTimer = useRef(null)
 
   useEffect(() => { loadProfile() }, [username])
 
@@ -117,6 +127,7 @@ export default function Profile() {
         setForm({ displayName: data.displayName, bio: data.bio ?? '' })
         setIsOwnProfile(true)
         loadTaste(null)
+        loadSocialData()
       } else {
         const [profileRes, meRes] = await Promise.allSettled([getProfile(username), getMe()])
         if (profileRes.status === 'rejected') { setPageError('User not found.'); return }
@@ -128,12 +139,20 @@ export default function Profile() {
         if (!mine) setFriendStatus(profileData.friendshipStatus ?? null)
         if (mine) setForm({ displayName: profileData.displayName, bio: profileData.bio ?? '' })
         loadTaste(mine ? null : username)
+        if (mine) loadSocialData()
       }
     } catch {
       setPageError('Failed to load profile.')
     } finally {
       setLoading(false)
     }
+  }
+
+  async function loadSocialData() {
+    const [fr, rq, gr] = await Promise.allSettled([getFriends(), getFriendRequests(), getGroups()])
+    if (fr.status === 'fulfilled') setFriends(fr.value.data ?? [])
+    if (rq.status === 'fulfilled') setRequests(rq.value.data ?? [])
+    if (gr.status === 'fulfilled') setGroups(gr.value.data ?? [])
   }
 
   async function loadTaste(u) {
@@ -213,6 +232,45 @@ export default function Profile() {
     }
   }
 
+  function handleFriendSearch(q) {
+    setFriendSearch(q)
+    clearTimeout(friendSearchTimer.current)
+    if (!q.trim() || q.trim().length < 2) { setFriendSearchResults([]); return }
+    friendSearchTimer.current = setTimeout(async () => {
+      setFriendSearching(true)
+      try {
+        const { data } = await searchUsers(q)
+        setFriendSearchResults(data)
+      } catch {}
+      setFriendSearching(false)
+    }, 300)
+  }
+
+  async function handleSendRequest(u) {
+    setFriendStatuses(prev => ({ ...prev, [u.id]: 'loading' }))
+    try {
+      await sendFriendRequest(u.id)
+      setFriendStatuses(prev => ({ ...prev, [u.id]: 'PENDING_SENT' }))
+    } catch (e) {
+      if (e.response?.data?.error === 'Already friends') {
+        setFriendStatuses(prev => ({ ...prev, [u.id]: 'ACCEPTED' }))
+      } else {
+        setFriendStatuses(prev => ({ ...prev, [u.id]: null }))
+      }
+    }
+  }
+
+  async function handleAcceptRequest(requesterId) {
+    setAcceptingId(requesterId)
+    try {
+      await acceptFriendRequest(requesterId)
+      setRequests(prev => prev.filter(r => r.requesterId !== requesterId))
+      const { data } = await getFriends()
+      setFriends(data ?? [])
+    } catch {}
+    setAcceptingId(null)
+  }
+
   function handleLogout() {
     localStorage.removeItem('token')
     localStorage.removeItem('user')
@@ -223,6 +281,8 @@ export default function Profile() {
     taste.genres?.length || taste.moods?.length ||
     taste.artists?.length || taste.eras?.length
   )
+
+  const friendCount = isOwnProfile ? friends.length : (user?.friendCount ?? 0)
 
   if (loading) {
     return (
@@ -249,8 +309,6 @@ export default function Profile() {
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      {showFindFriends && <FindFriendsSheet onClose={() => setShowFindFriends(false)} />}
-
       {/* Gradient header */}
       <div className="relative flex-shrink-0">
         <div className="absolute inset-0 bg-gradient-to-b from-indigo-900/60 via-[#121212]/50 to-transparent pointer-events-none" />
@@ -266,6 +324,10 @@ export default function Profile() {
               <p className="text-[#B3B3B3] text-xs font-bold uppercase tracking-widest mb-1">Profile</p>
               <h1 className="text-white font-black text-5xl mb-3 leading-none">{user.displayName}</h1>
               {user.bio && <p className="text-[#B3B3B3] text-sm mb-1">{user.bio}</p>}
+              <p className="text-white text-sm">
+                <span className="font-bold">{friendCount}</span>{' '}
+                <span className="text-[#B3B3B3]">friend{friendCount !== 1 ? 's' : ''}</span>
+              </p>
               <p className="text-white text-sm">
                 <span className="font-bold">{user.jamGuruForCount ?? 0}</span>{' '}
                 <span className="text-[#B3B3B3]">listener{user.jamGuruForCount !== 1 ? 's' : ''} this month</span>
@@ -292,12 +354,6 @@ export default function Profile() {
                   {editingTaste ? 'Cancel' : 'Edit taste'}
                 </button>
                 <button
-                  onClick={() => setShowFindFriends(true)}
-                  className="flex items-center gap-1.5 border border-[#878787] hover:border-white text-white text-sm font-semibold px-5 py-1.5 rounded-full transition-colors"
-                >
-                  <UserPlus size={14} /> Find Friends
-                </button>
-                <button
                   onClick={handleLogout}
                   className="text-[#B3B3B3] hover:text-white text-sm font-semibold px-4 py-1.5 rounded-full transition-colors"
                 >
@@ -305,7 +361,6 @@ export default function Profile() {
                 </button>
               </>
             ) : (
-              /* Add Friend button for other users' profiles */
               friendStatus === 'ACCEPTED' ? (
                 <div className="flex items-center gap-2 border border-[#1DB954]/40 text-[#1DB954] text-sm font-semibold px-5 py-1.5 rounded-full">
                   <UserCheck size={15} /> Friends
@@ -356,6 +411,170 @@ export default function Profile() {
               >
                 {saving ? 'Saving…' : 'Save'}
               </button>
+            </div>
+          )}
+
+          {/* Friends & Groups — own profile only */}
+          {isOwnProfile && (
+            <div className="space-y-6">
+
+              {/* Friends */}
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <h2 className="text-white font-bold text-xl">Friends</h2>
+                  <span className="text-[#535353] text-sm">{friends.length} friends</span>
+                </div>
+
+                {/* Incoming requests */}
+                {requests.length > 0 && (
+                  <div className="mb-3 space-y-1.5">
+                    {requests.map(r => (
+                      <div key={r.requesterId} className="flex items-center gap-3 bg-[#1DB954]/10 border border-[#1DB954]/20 rounded-xl px-4 py-2.5">
+                        <div className="w-9 h-9 rounded-full bg-[#535353] flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
+                          {r.requester?.displayName?.[0]?.toUpperCase() ?? '?'}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-white text-sm font-semibold truncate">{r.requester?.displayName}</p>
+                          <p className="text-[#1DB954] text-xs font-medium">Wants to be friends</p>
+                        </div>
+                        <button
+                          onClick={() => handleAcceptRequest(r.requesterId)}
+                          disabled={acceptingId === r.requesterId}
+                          className="flex items-center gap-1 bg-[#1DB954] hover:bg-[#1ed760] text-black text-xs font-bold px-3 py-1.5 rounded-full transition-colors disabled:opacity-60 flex-shrink-0"
+                        >
+                          <Check size={12} /> Accept
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Friends list */}
+                {friends.length > 0 && (
+                  <div className="bg-[#181818] rounded-xl divide-y divide-white/5 mb-3">
+                    {friends.map(f => (
+                      <div key={f.id} className="flex items-center gap-3 px-4 py-2.5">
+                        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#1DB954] to-emerald-700 flex items-center justify-center text-black text-sm font-bold flex-shrink-0">
+                          {f.displayName?.[0]?.toUpperCase() ?? '?'}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-white text-sm font-medium truncate">{f.displayName}</p>
+                          <p className="text-[#535353] text-xs">@{f.username}</p>
+                        </div>
+                        <UserCheck size={14} className="text-[#535353] flex-shrink-0" />
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Inline friend search / add */}
+                <div className="bg-[#181818] rounded-xl p-3">
+                  <div className="flex items-center gap-2 bg-[#282828] rounded-full px-3 py-2">
+                    <Search size={13} className="text-[#535353] flex-shrink-0" />
+                    <input
+                      value={friendSearch}
+                      onChange={e => handleFriendSearch(e.target.value)}
+                      placeholder="Find and add friends…"
+                      className="flex-1 bg-transparent text-white text-xs placeholder-[#535353] focus:outline-none"
+                    />
+                    {friendSearching && (
+                      <div className="w-3 h-3 border border-[#535353] border-t-transparent rounded-full animate-spin flex-shrink-0" />
+                    )}
+                    {friendSearch && (
+                      <button onClick={() => { setFriendSearch(''); setFriendSearchResults([]) }}>
+                        <X size={13} className="text-[#535353] hover:text-white transition-colors" />
+                      </button>
+                    )}
+                  </div>
+
+                  {friendSearchResults.length > 0 && (
+                    <div className="mt-2 space-y-0.5">
+                      {friendSearchResults.map(u => {
+                        const status = friendStatuses[u.id] ?? u.friendshipStatus ?? null
+                        return (
+                          <div key={u.id} className="flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-white/5 transition-colors">
+                            <div className="w-8 h-8 rounded-full bg-[#535353] flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                              {u.displayName?.[0]?.toUpperCase() ?? '?'}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-white text-xs font-semibold truncate">{u.displayName}</p>
+                              <p className="text-[#535353] text-[10px]">@{u.username}</p>
+                            </div>
+                            {status === 'ACCEPTED' && (
+                              <span className="text-[#1DB954] text-[10px] font-semibold flex-shrink-0">Friends</span>
+                            )}
+                            {status === 'PENDING_SENT' && (
+                              <span className="text-[#535353] text-[10px] font-semibold flex-shrink-0">Requested</span>
+                            )}
+                            {status === 'loading' && (
+                              <div className="w-3 h-3 border border-[#535353] border-t-transparent rounded-full animate-spin flex-shrink-0" />
+                            )}
+                            {status === 'PENDING_RECEIVED' && (
+                              <button
+                                onClick={() => handleAcceptRequest(u.id)}
+                                disabled={acceptingId === u.id}
+                                className="flex items-center gap-1 bg-[#1DB954] text-black text-[10px] font-bold px-2.5 py-1 rounded-full hover:bg-[#1ed760] transition-colors flex-shrink-0"
+                              >
+                                <Check size={10} /> Accept
+                              </button>
+                            )}
+                            {!status && (
+                              <button
+                                onClick={() => handleSendRequest(u)}
+                                className="flex items-center gap-1 bg-[#1DB954] text-black text-[10px] font-bold px-2.5 py-1 rounded-full hover:bg-[#1ed760] transition-colors flex-shrink-0"
+                              >
+                                <UserPlus size={10} /> Add
+                              </button>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+
+                  {friendSearch.trim().length >= 2 && !friendSearching && friendSearchResults.length === 0 && (
+                    <p className="text-[#535353] text-xs text-center py-3">No users found</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Groups */}
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <h2 className="text-white font-bold text-xl">Groups</h2>
+                  <span className="text-[#535353] text-sm">{groups.length} groups</span>
+                </div>
+
+                {groups.length > 0 && (
+                  <div className="bg-[#181818] rounded-xl divide-y divide-white/5 mb-3">
+                    {groups.map(g => (
+                      <div key={g.id} className="flex items-center gap-3 px-4 py-2.5">
+                        <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-purple-600 to-violet-800 flex items-center justify-center flex-shrink-0">
+                          <Users size={14} className="text-white" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-white text-sm font-medium truncate">{g.name}</p>
+                          <p className="text-[#535353] text-xs">{g.memberCount ?? 0} members</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {groups.length === 0 && (
+                  <div className="bg-[#181818] rounded-xl p-4 text-center mb-3">
+                    <p className="text-[#535353] text-sm">No groups yet</p>
+                  </div>
+                )}
+
+                <Link
+                  to="/groups"
+                  className="flex items-center justify-center gap-1.5 w-full py-2 rounded-xl border border-dashed border-white/20 text-[#B3B3B3] hover:text-white hover:border-white/40 text-sm font-semibold transition-colors"
+                >
+                  <Users size={13} /> Join or Create a Group
+                </Link>
+              </div>
+
             </div>
           )}
 
