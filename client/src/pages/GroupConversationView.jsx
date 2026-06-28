@@ -49,11 +49,27 @@ function GroupMessage({ msg, onLikeToggle, requestText }) {
   const me      = JSON.parse(localStorage.getItem('user') || '{}')
   const isMe    = msg.sender?.id === me.id
   const isReply = !!msg.groupRequestId
-  const [disliked, setDisliked] = useState(false)
-  const [notForMe, setNotForMe] = useState(false)
 
-  async function handleDislike() {
-    try { await dislikeSong(msg.song.spotifyId); setDisliked(true) } catch (_) {}
+  // Single toggleable reaction state — mirrors DM Bubble pattern
+  const [reaction, setReaction] = useState(null) // 'notForMe' | 'notMyVibe' | null
+  const [apiDisliked, setApiDisliked] = useState(false) // guard: only call dislikeSong once
+
+  const notForMeActive  = reaction === 'notForMe'
+  const notMyVibeActive = reaction === 'notMyVibe'
+  const anyReaction     = notForMeActive || notMyVibeActive
+
+  function handleNotForMe() {
+    setReaction(notForMeActive ? null : 'notForMe')
+    window.dispatchEvent(new CustomEvent('jam:like'))
+  }
+
+  async function handleNotMyVibe() {
+    const next = notMyVibeActive ? null : 'notMyVibe'
+    setReaction(next)
+    if (next === 'notMyVibe' && !apiDisliked) {
+      try { await dislikeSong(msg.song.spotifyId); setApiDisliked(true) } catch (_) {}
+    }
+    window.dispatchEvent(new CustomEvent('jam:like'))
   }
 
   return (
@@ -67,7 +83,7 @@ function GroupMessage({ msg, onLikeToggle, requestText }) {
         isMe
           ? isReply ? 'bg-purple-600/25 rounded-tr-sm' : 'bg-purple-600/20 rounded-tr-sm'
           : isReply ? 'bg-[#2e2e2e] rounded-tl-sm' : 'bg-[#282828] rounded-tl-sm'
-      } ${disliked ? 'opacity-60' : ''}`}>
+      } ${notMyVibeActive ? 'opacity-60' : ''}`}>
 
         {!isMe && (
           <p className="text-purple-400 text-[10px] font-bold mb-1.5">{msg.sender?.displayName}</p>
@@ -85,7 +101,7 @@ function GroupMessage({ msg, onLikeToggle, requestText }) {
           </div>
         )}
 
-        {/* Song row */}
+        {/* Song row — play + heart column on the right for received, play only for sent */}
         <div className="flex items-center gap-2.5">
           <div className="w-11 h-11 flex-shrink-0 rounded-lg overflow-hidden bg-[#3e3e3e]">
             {msg.song.albumArtUrl
@@ -97,52 +113,78 @@ function GroupMessage({ msg, onLikeToggle, requestText }) {
             <p className="text-white text-xs font-semibold truncate leading-tight">{msg.song.title}</p>
             <p className="text-[#B3B3B3] text-[10px] truncate mt-0.5">{msg.song.artist}</p>
           </div>
-          {msg.song.previewUrl && (
-            <button onClick={() => player.toggle(msg.song)}
-              className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 transition-colors ${
-                playing ? 'bg-purple-500 text-white' : 'bg-[#3e3e3e] text-white hover:bg-[#535353]'
-              }`}>
-              {playing ? <Pause size={10} fill="currentColor" /> : <Play size={10} fill="currentColor" />}
-            </button>
+
+          {!isMe ? (
+            <div className="flex flex-col items-center gap-1.5 flex-shrink-0">
+              {msg.song.previewUrl && (
+                <button onClick={() => player.toggle(msg.song)}
+                  className={`w-7 h-7 rounded-full flex items-center justify-center transition-colors ${
+                    playing ? 'bg-purple-500 text-white' : 'bg-[#3e3e3e] text-white hover:bg-[#535353]'
+                  }`}>
+                  {playing ? <Pause size={10} fill="currentColor" /> : <Play size={10} fill="currentColor" />}
+                </button>
+              )}
+              <button
+                onClick={() => !anyReaction && onLikeToggle(msg)}
+                disabled={anyReaction}
+                className={`flex flex-col items-center gap-0.5 transition-colors ${
+                  msg.liked ? 'text-purple-400 hover:text-red-400'
+                    : anyReaction ? 'text-[#333] cursor-not-allowed'
+                    : 'text-[#B3B3B3] hover:text-white'
+                }`}
+              >
+                <Heart size={14} fill={msg.liked ? 'currentColor' : 'none'} />
+                {msg.likeCount > 0 && <span className="text-[9px] font-medium leading-none">{msg.likeCount}</span>}
+              </button>
+            </div>
+          ) : (
+            msg.song.previewUrl && (
+              <button onClick={() => player.toggle(msg.song)}
+                className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 transition-colors ${
+                  playing ? 'bg-purple-500 text-white' : 'bg-[#3e3e3e] text-white hover:bg-[#535353]'
+                }`}>
+                {playing ? <Pause size={10} fill="currentColor" /> : <Play size={10} fill="currentColor" />}
+              </button>
+            )
           )}
         </div>
 
         {msg.context && <p className="text-white/60 text-xs italic mt-2 leading-relaxed">"{msg.context}"</p>}
-        <p className="text-[#535353] text-[9px] mt-1.5 text-right">{formatTime(msg.sentAt)}</p>
 
-        {!isMe && (
-          <div className="mt-1.5 pt-1.5 border-t border-white/5 flex items-center justify-between">
-            <button onClick={() => setNotForMe(true)} disabled={disliked || notForMe}
-              className={`text-[10px] transition-colors ${
-                notForMe ? 'text-[#535353]' : disliked ? 'text-[#333] cursor-not-allowed' : 'text-[#535353] hover:text-[#B3B3B3]'
-              }`}>
-              {notForMe ? 'Not for me' : 'Not for me'}
-            </button>
-            <div className="flex items-center gap-2">
-              <button onClick={handleDislike} disabled={notForMe || disliked}
-                className={`flex items-center gap-1 text-[10px] transition-colors ${
-                  disliked ? 'text-[#535353]' : notForMe ? 'text-[#333] cursor-not-allowed' : 'text-[#535353] hover:text-red-400'
-                }`}>
-                <ThumbsDown size={9} fill={disliked ? 'currentColor' : 'none'} />
-              </button>
-              <button onClick={() => !disliked && !notForMe && onLikeToggle(msg)}
-                disabled={disliked || notForMe}
-                className={`flex items-center gap-1 text-[10px] transition-colors ${
-                  msg.liked ? 'text-purple-400' : 'text-[#B3B3B3] hover:text-white'
-                } ${disliked || notForMe ? 'opacity-40 cursor-not-allowed' : ''}`}>
-                <Heart size={10} fill={msg.liked ? 'currentColor' : 'none'} />
-                {msg.likeCount > 0 && <span>{msg.likeCount}</span>}
-              </button>
-            </div>
-          </div>
-        )}
-
+        {/* Sent: show aggregate like count */}
         {isMe && msg.likeCount > 0 && (
-          <div className="mt-1 flex items-center justify-end gap-1">
+          <div className="mt-2 flex items-center gap-1">
             <Heart size={9} className="text-purple-400" fill="currentColor" />
-            <span className="text-[9px] text-purple-400">{msg.likeCount}</span>
+            <span className="text-[9px] text-purple-400">{msg.likeCount} {msg.likeCount === 1 ? 'like' : 'likes'}</span>
           </div>
         )}
+
+        {/* Received: reaction buttons — same layout as DM */}
+        {!isMe && (
+          <div className="mt-2 pt-1.5 border-t border-white/5 flex items-center justify-between">
+            <button onClick={handleNotForMe}
+              disabled={msg.liked || notMyVibeActive}
+              className={`text-[10px] font-medium transition-colors ${
+                notForMeActive ? 'text-white'
+                  : msg.liked || notMyVibeActive ? 'text-[#333] cursor-not-allowed'
+                  : 'text-[#535353] hover:text-[#B3B3B3]'
+              }`}>
+              Not for me
+            </button>
+            <button onClick={handleNotMyVibe}
+              disabled={msg.liked || notForMeActive}
+              className={`flex items-center gap-1 text-[10px] font-medium transition-colors ${
+                notMyVibeActive ? 'text-red-400'
+                  : msg.liked || notForMeActive ? 'text-[#333] cursor-not-allowed'
+                  : 'text-[#535353] hover:text-red-400'
+              }`}>
+              <ThumbsDown size={9} fill={notMyVibeActive ? 'currentColor' : 'none'} />
+              Not my vibe
+            </button>
+          </div>
+        )}
+
+        <p className="text-[#535353] text-[9px] mt-1.5 text-right">{formatTime(msg.sentAt)}</p>
       </div>
     </div>
   )
@@ -409,6 +451,7 @@ export default function GroupConversationView({ group, onBack }) {
       }
     } catch (_) {}
     setLiking(null)
+    window.dispatchEvent(new CustomEvent('jam:like'))
   }
 
   // ── AI suggest ──────────────────────────────────────────────
