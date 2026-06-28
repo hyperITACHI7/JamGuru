@@ -14,13 +14,16 @@ const SAFE_USER = { id: true, username: true, displayName: true, avatarUrl: true
 // POST /api/groups — create a group; creator is automatically a member
 router.post('/', auth, async (req, res) => {
   try {
-    const { name, memberIds = [] } = req.body;
+    const { name, memberIds = [], description = '', isPublic = false } = req.body;
     if (!name || !name.trim()) return res.status(400).json({ error: 'Group name is required' });
     if (name.trim().length > 60) return res.status(400).json({ error: 'Group name must be 60 characters or fewer' });
+    if (description && description.length > 280) return res.status(400).json({ error: 'Description must be 280 characters or fewer' });
 
     const group = await prisma.group.create({
       data: {
         name: name.trim(),
+        description: description?.trim() || null,
+        isPublic: !!isPublic,
         createdBy: req.userId,
         members: {
           create: [
@@ -38,6 +41,32 @@ router.post('/', auth, async (req, res) => {
     });
 
     res.status(201).json(group);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// GET /api/groups/search — search public groups (not yet joined by current user)
+router.get('/search', auth, async (req, res) => {
+  try {
+    const q = (req.query.q || '').trim();
+    const groups = await prisma.group.findMany({
+      where: {
+        isPublic: true,
+        NOT: { members: { some: { userId: req.userId } } },
+        ...(q ? { name: { contains: q, mode: 'insensitive' } } : {}),
+      },
+      include: { _count: { select: { members: true } } },
+      orderBy: { createdAt: 'desc' },
+      take: 5,
+    });
+    res.json(groups.map(g => ({
+      id: g.id,
+      name: g.name,
+      description: g.description,
+      memberCount: g._count.members,
+    })));
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'Server error' });
@@ -120,6 +149,59 @@ router.post('/:id/members', auth, async (req, res) => {
       include: { members: { include: { user: { select: SAFE_USER } }, orderBy: { joinedAt: 'asc' } } },
     });
     res.json(updated);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// PATCH /api/groups/:id — update name / description / isPublic (creator only)
+router.patch('/:id', auth, async (req, res) => {
+  try {
+    const group = await prisma.group.findUnique({ where: { id: req.params.id } });
+    if (!group) return res.status(404).json({ error: 'Group not found' });
+    if (group.createdBy !== req.userId) return res.status(403).json({ error: 'Only the creator can edit group settings' });
+
+    const { name, description, isPublic } = req.body;
+    if (name !== undefined && !name.trim()) return res.status(400).json({ error: 'Group name is required' });
+    if (name !== undefined && name.trim().length > 60) return res.status(400).json({ error: 'Group name must be 60 characters or fewer' });
+    if (description !== undefined && description.length > 280) return res.status(400).json({ error: 'Description must be 280 characters or fewer' });
+
+    const updated = await prisma.group.update({
+      where: { id: req.params.id },
+      data: {
+        ...(name !== undefined      ? { name: name.trim() }               : {}),
+        ...(description !== undefined ? { description: description.trim() || null } : {}),
+        ...(isPublic !== undefined  ? { isPublic: !!isPublic }            : {}),
+      },
+      include: {
+        creator: { select: SAFE_USER },
+        members: { include: { user: { select: SAFE_USER } }, orderBy: { joinedAt: 'asc' } },
+      },
+    });
+
+    res.json(updated);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// POST /api/groups/:id/join — self-join a public group
+router.post('/:id/join', auth, async (req, res) => {
+  try {
+    const group = await prisma.group.findUnique({ where: { id: req.params.id } });
+    if (!group) return res.status(404).json({ error: 'Group not found' });
+    if (!group.isPublic) return res.status(403).json({ error: 'This group is private — ask the creator to invite you' });
+
+    try {
+      await prisma.groupMember.create({ data: { groupId: req.params.id, userId: req.userId } });
+    } catch (e) {
+      if (e.code === 'P2002') return res.status(409).json({ error: 'Already a member' });
+      throw e;
+    }
+
+    res.json({ joined: true });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'Server error' });

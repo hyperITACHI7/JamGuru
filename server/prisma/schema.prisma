@@ -200,10 +200,12 @@ model PersonalTrustRanking {
 }
 
 model Group {
-  id        String   @id @default(uuid())
-  name      String
-  createdBy String   @map("created_by")
-  createdAt DateTime @default(now()) @map("created_at")
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  isPublic    Boolean  @default(false) @map("is_public")
+  createdBy   String   @map("created_by")
+  createdAt   DateTime @default(now()) @map("created_at")
 
   creator         User              @relation("GroupCreator", fields: [createdBy], references: [id], onDelete: Cascade)
   members         GroupMember[]
