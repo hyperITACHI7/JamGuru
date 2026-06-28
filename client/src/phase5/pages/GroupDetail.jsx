@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, Component } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { Users, UserPlus, ArrowLeft, BarChart2, X, Globe, Lock, Settings } from 'lucide-react'
 import TopBar from '../../components/layout/TopBar'
@@ -7,6 +7,27 @@ import { getGroup, getGroupFeed, getGroupScore, addMember, removeMember, updateG
 import { searchUsers } from '../../phase3/api/friends'
 
 const me = () => JSON.parse(localStorage.getItem('user') || '{}')
+
+class GroupErrorBoundary extends Component {
+  state = { crashed: false }
+  static getDerivedStateFromError() { return { crashed: true } }
+  render() {
+    if (this.state.crashed) {
+      return (
+        <div className="flex-1 flex flex-col items-center justify-center gap-4 min-h-0 px-6 text-center">
+          <p className="text-white font-semibold">Something went wrong loading this group</p>
+          <button
+            onClick={() => { this.setState({ crashed: false }); window.location.reload() }}
+            className="text-[#1DB954] text-sm hover:underline"
+          >
+            Reload
+          </button>
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
 
 // ── Score Widget ──────────────────────────────────────────────────────────────
 
@@ -259,7 +280,7 @@ function SettingsPanel({ group, onUpdated }) {
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 
-export default function GroupDetail() {
+function GroupDetailInner() {
   const { id }                  = useParams()
   const [group, setGroup]       = useState(null)
   const [feed, setFeed]         = useState([])
@@ -401,5 +422,13 @@ export default function GroupDetail() {
         )}
       </div>
     </div>
+  )
+}
+
+export default function GroupDetail() {
+  return (
+    <GroupErrorBoundary>
+      <GroupDetailInner />
+    </GroupErrorBoundary>
   )
 }

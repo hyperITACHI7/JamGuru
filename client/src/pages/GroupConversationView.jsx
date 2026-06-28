@@ -44,10 +44,12 @@ function renderTemplateWithPills(templateId, vars, cycleVar) {
 
 function GroupMessage({ msg, onLikeToggle, requestText }) {
   const player  = usePlayer()
+  const song    = msg.song ?? {}
+  const sender  = msg.sender ?? { displayName: 'Deleted user' }
   const active  = player.isActive(msg.song)
   const playing = active && player.playing
   const me      = JSON.parse(localStorage.getItem('user') || '{}')
-  const isMe    = msg.sender?.id === me.id
+  const isMe    = sender.id === me.id
   const isReply = !!msg.groupRequestId
 
   // Single toggleable reaction state — mirrors DM Bubble pattern
@@ -76,7 +78,7 @@ function GroupMessage({ msg, onLikeToggle, requestText }) {
     <div className={`flex ${isMe ? 'justify-end' : 'justify-start'} mb-4 px-4`}>
       {!isMe && (
         <div className="w-7 h-7 rounded-full bg-[#535353] flex items-center justify-center text-white text-xs font-bold flex-shrink-0 mr-2 mt-1">
-          {msg.sender?.displayName?.[0]?.toUpperCase() ?? '?'}
+          {sender.displayName?.[0]?.toUpperCase() ?? '?'}
         </div>
       )}
       <div className={`max-w-[68%] rounded-2xl p-3 ${
@@ -86,7 +88,7 @@ function GroupMessage({ msg, onLikeToggle, requestText }) {
       } ${notMyVibeActive ? 'opacity-60' : ''}`}>
 
         {!isMe && (
-          <p className="text-purple-400 text-[10px] font-bold mb-1.5">{msg.sender?.displayName}</p>
+          <p className="text-purple-400 text-[10px] font-bold mb-1.5">{sender.displayName}</p>
         )}
 
         {/* Reply quote block */}
@@ -104,19 +106,19 @@ function GroupMessage({ msg, onLikeToggle, requestText }) {
         {/* Song row — play + heart column on the right for received, play only for sent */}
         <div className="flex items-center gap-2.5">
           <div className="w-11 h-11 flex-shrink-0 rounded-lg overflow-hidden bg-[#3e3e3e]">
-            {msg.song.albumArtUrl
-              ? <img src={msg.song.albumArtUrl} alt={msg.song.title} className="w-full h-full object-cover" />
+            {song.albumArtUrl
+              ? <img src={song.albumArtUrl} alt={song.title} className="w-full h-full object-cover" />
               : <div className="w-full h-full flex items-center justify-center"><Music size={14} className="text-[#B3B3B3]" /></div>
             }
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-white text-xs font-semibold truncate leading-tight">{msg.song.title}</p>
-            <p className="text-[#B3B3B3] text-[10px] truncate mt-0.5">{msg.song.artist}</p>
+            <p className="text-white text-xs font-semibold truncate leading-tight">{song.title}</p>
+            <p className="text-[#B3B3B3] text-[10px] truncate mt-0.5">{song.artist}</p>
           </div>
 
           {!isMe ? (
             <div className="flex flex-col items-center gap-1.5 flex-shrink-0">
-              {msg.song.previewUrl && (
+              {song.previewUrl && (
                 <button onClick={() => player.toggle(msg.song)}
                   className={`w-7 h-7 rounded-full flex items-center justify-center transition-colors ${
                     playing ? 'bg-purple-500 text-white' : 'bg-[#3e3e3e] text-white hover:bg-[#535353]'
@@ -144,7 +146,7 @@ function GroupMessage({ msg, onLikeToggle, requestText }) {
               </div>
             </div>
           ) : (
-            msg.song.previewUrl && (
+            song.previewUrl && (
               <button onClick={() => player.toggle(msg.song)}
                 className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 transition-colors ${
                   playing ? 'bg-purple-500 text-white' : 'bg-[#3e3e3e] text-white hover:bg-[#535353]'
@@ -203,14 +205,14 @@ function GroupRequestBubble({ msg, onPickSong }) {
     <div className={`flex ${isMe ? 'justify-end' : 'justify-start'} mb-4 px-4`}>
       {!isMe && (
         <div className="w-7 h-7 rounded-full bg-[#535353] flex items-center justify-center text-white text-xs font-bold flex-shrink-0 mr-2 mt-1">
-          {msg.sender?.displayName?.[0]?.toUpperCase() ?? '?'}
+          {sender.displayName?.[0]?.toUpperCase() ?? '?'}
         </div>
       )}
       <div className={`max-w-[68%] rounded-2xl p-3 ${
         isMe ? 'bg-purple-500/10 border border-purple-500/20 rounded-tr-sm' : 'bg-[#282828] rounded-tl-sm'
       }`}>
         {!isMe && (
-          <p className="text-purple-400 text-[10px] font-bold mb-1.5">{msg.sender?.displayName}</p>
+          <p className="text-purple-400 text-[10px] font-bold mb-1.5">{sender.displayName}</p>
         )}
         <div className="flex items-center gap-1.5 mb-2">
           <Music size={10} className="text-purple-400" />
