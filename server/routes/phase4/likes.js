@@ -2,6 +2,7 @@ const express = require('express');
 const { PrismaClient } = require('@prisma/client');
 const auth = require('../../middleware/auth');
 const { recomputeScores, FEEDBACK_TAGS } = require('../../services/phase4/scoring');
+const { pushNotify } = require('../../services/pushNotifier');
 const { refreshTasteProfile } = require('../../services/tasteProfile');
 
 const router = express.Router();
@@ -10,7 +11,7 @@ const prisma = new PrismaClient();
 // POST /api/recommendations/:id/like
 router.post('/recommendations/:id/like', auth, async (req, res) => {
   try {
-    const rec = await prisma.recommendation.findUnique({ where: { id: req.params.id } });
+    const rec = await prisma.recommendation.findUnique({ where: { id: req.params.id }, include: { song: true } });
     if (!rec) return res.status(404).json({ error: 'Recommendation not found' });
     if (rec.recipientId !== req.userId) return res.status(403).json({ error: 'Not your recommendation' });
     if (rec.senderId === req.userId) return res.status(400).json({ error: 'Cannot like your own recommendation' });
@@ -34,6 +35,14 @@ router.post('/recommendations/:id/like', auth, async (req, res) => {
 
     await recomputeScores(prisma, { recommendationId: req.params.id, likerId: req.userId });
     refreshTasteProfile(prisma, req.userId).catch(() => {});
+
+    // Push notification to rec sender (fire-and-forget)
+    prisma.user.findUnique({ where: { id: req.userId }, select: { displayName: true } })
+      .then(liker => pushNotify(prisma, rec.senderId, {
+        title: `${liker.displayName} loved your rec ❤️`,
+        body: rec.song?.title ?? 'Your recommendation',
+        url: '/jamguru',
+      })).catch(() => {})
 
     const likeCount = await prisma.like.count({ where: { recommendationId: req.params.id } });
     res.json({ liked: true, likeCount, likeId: like.id });

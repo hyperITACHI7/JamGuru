@@ -1,5 +1,6 @@
 import { useNavigate, useLocation } from 'react-router-dom'
-import { ChevronLeft, User } from 'lucide-react'
+import { ChevronLeft, User, Bell, BellOff } from 'lucide-react'
+import { usePushNotifications } from '../../hooks/usePushNotifications'
 
 // Structural parent map — back button always goes to the expected parent,
 // not the previous browser-history entry.
@@ -25,6 +26,7 @@ export default function TopBar({ transparent = false, rightExtra = null }) {
 
   const parentRoute = getParentRoute(location.pathname)
   const firstName = (user.displayName || '').split(' ')[0] || 'Profile'
+  const { supported, subscribed, permission, toggle } = usePushNotifications()
 
   return (
     <div
@@ -49,10 +51,22 @@ export default function TopBar({ transparent = false, rightExtra = null }) {
 
       {/* Right controls */}
       <div className="flex items-center gap-2 md:gap-3">
-        {/* Desktop-only extras */}
-        <button className="hidden md:block bg-white text-black text-xs font-bold px-4 py-1.5 rounded-full hover:scale-105 transition-transform">
-          Upgrade
-        </button>
+        {/* Notification bell */}
+        {supported && (
+          <button
+            onClick={toggle}
+            title={
+              permission === 'denied' ? 'Enable notifications in browser settings' :
+              subscribed ? 'Disable notifications' : 'Enable notifications'
+            }
+            className="w-8 h-8 rounded-full bg-[#282828] flex items-center justify-center hover:bg-[#3e3e3e] transition-colors"
+          >
+            {subscribed
+              ? <Bell size={16} className="text-[#1DB954]" />
+              : <BellOff size={16} className="text-[#B3B3B3]" />
+            }
+          </button>
+        )}
 
         {/* Profile — avatar + first name on mobile, full name pill on desktop */}
         <button

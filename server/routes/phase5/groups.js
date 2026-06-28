@@ -3,6 +3,7 @@ const { PrismaClient } = require('@prisma/client');
 const auth = require('../../middleware/auth');
 const { recomputeGroupScore, todayDate } = require('../../services/phase5/groupScoring');
 const { notifyMany } = require('../../sse');
+const { pushNotify } = require('../../services/pushNotifier');
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -274,6 +275,18 @@ router.post('/:id/recommendations', auth, async (req, res) => {
     });
     notifyMany(otherMembers.map(m => m.userId), 'new_group_activity', { groupId: req.params.id });
 
+    // Push notification (fire-and-forget)
+    prisma.group.findUnique({ where: { id: req.params.id }, select: { name: true } })
+      .then(group => {
+        otherMembers.forEach(m => {
+          pushNotify(prisma, m.userId, {
+            title: `New song in ${group.name} 🎵`,
+            body: `${rec.sender.displayName} shared a track`,
+            url: `/groups/${req.params.id}`,
+          }).catch(() => {})
+        })
+      }).catch(() => {})
+
     // Update group score — increment recsSent
     const today = todayDate();
     await prisma.groupScore.upsert({
@@ -319,6 +332,20 @@ router.post('/:id/requests', auth, async (req, res) => {
       select: { userId: true },
     });
     notifyMany(otherMembers.map(m => m.userId), 'new_group_activity', { groupId: req.params.id });
+
+    // Push notification (fire-and-forget)
+    Promise.all([
+      prisma.group.findUnique({ where: { id: req.params.id }, select: { name: true } }),
+      prisma.user.findUnique({ where: { id: req.userId }, select: { displayName: true } }),
+    ]).then(([group, sender]) => {
+      otherMembers.forEach(m => {
+        pushNotify(prisma, m.userId, {
+          title: `Song request in ${group.name} 🎤`,
+          body: `${sender.displayName} is looking for a rec`,
+          url: `/groups/${req.params.id}`,
+        }).catch(() => {})
+      })
+    }).catch(() => {})
 
     res.status(201).json(request);
   } catch (e) {

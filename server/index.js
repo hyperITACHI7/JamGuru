@@ -19,6 +19,7 @@ const p7AiRoutes      = require('./routes/phase7/ai');
 const tasteRoutes     = require('./routes/tasteProfile');
 const playlistRoutes      = require('./routes/playlists');
 const songRequestRoutes   = require('./routes/songRequests');
+const notifRoutes         = require('./routes/notifications');
 const { scheduleMonthlyReset } = require('./jobs/monthlyReset');
 
 const app = express();
@@ -46,6 +47,7 @@ app.use('/api',                 p7AiRoutes);      // /api/ai/context/:id, /api/a
 app.use('/api/profile/taste',   tasteRoutes);
 app.use('/api/playlists',       playlistRoutes);
 app.use('/api/song-requests',   songRequestRoutes);
+app.use('/api/notifications',   notifRoutes);
 
 app.get('/api/health', (_req, res) => res.json({ status: 'ok' }));
 

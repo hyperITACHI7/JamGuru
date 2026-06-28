@@ -44,6 +44,7 @@ model User {
   songLikes               SongLike[]
   songDislikes            SongDislike[]
   playlists               Playlist[]
+  pushSubscriptions       PushSubscription[]
 
   @@map("users")
 }
@@ -285,6 +286,20 @@ model GroupSongRequest {
   sender User  @relation("GroupSongReqSender", fields: [senderId], references: [id], onDelete: Cascade)
 
   @@map("group_song_requests")
+}
+
+model PushSubscription {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  endpoint  String
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, endpoint])
+  @@map("push_subscriptions")
 }
 
 model GroupScore {

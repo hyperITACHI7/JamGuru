@@ -3,6 +3,7 @@ const { PrismaClient } = require('@prisma/client');
 const auth = require('../../middleware/auth');
 const { thisMonthStart } = require('../../services/phase4/scoring');
 const { notify } = require('../../sse');
+const { pushNotify } = require('../../services/pushNotifier');
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -72,6 +73,14 @@ router.post('/', auth, async (req, res) => {
     });
 
     notify(recipientId, 'new_dm_rec', { fromFriendId: req.userId });
+
+    // Push notification (fire-and-forget)
+    prisma.user.findUnique({ where: { id: req.userId }, select: { displayName: true } })
+      .then(sender => pushNotify(prisma, recipientId, {
+        title: `${sender.displayName} sent you a song 🎵`,
+        body: 'Tap to check your inbox',
+        url: '/jamguru',
+      })).catch(() => {})
 
     res.status(201).json(rec);
   } catch (e) {

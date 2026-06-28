@@ -1,4 +1,5 @@
 // All score recalculation logic for Phase 4.
+const { pushNotify } = require('../pushNotifier');
 // Called after every like or unlike — always recomputes from source-of-truth counts
 // so scores stay consistent even if events arrive out of order.
 
@@ -95,11 +96,32 @@ async function recomputeScores(prisma, { recommendationId, likerId }) {
   const likesGiven   = likedIds.size;
   const recsReceived = allRecs.length;
 
+  const prevTop = await prisma.personalTrustRanking.findFirst({
+    where: { ownerId: likerId, month: monthStart, trustScore: { gt: 0 } },
+    orderBy: [{ trustScore: 'desc' }, { likesGiven: 'desc' }],
+    select: { friendId: true },
+  });
+
   await prisma.personalTrustRanking.upsert({
     where: { ownerId_friendId_month: { ownerId: likerId, friendId: senderId, month: monthStart } },
     create: { ownerId: likerId, friendId: senderId, month: monthStart, likesGiven, recsReceived, trustScore },
     update: { likesGiven, recsReceived, trustScore },
   });
+
+  const newTop = await prisma.personalTrustRanking.findFirst({
+    where: { ownerId: likerId, month: monthStart, trustScore: { gt: 0 } },
+    orderBy: [{ trustScore: 'desc' }, { likesGiven: 'desc' }],
+    select: { friendId: true },
+  });
+
+  if (newTop?.friendId === senderId && prevTop?.friendId !== senderId) {
+    prisma.user.findUnique({ where: { id: likerId }, select: { displayName: true } })
+      .then(liker => pushNotify(prisma, senderId, {
+        title: `You're ${liker?.displayName}'s JamGuru 👑`,
+        body: "They trust your music taste the most this month!",
+        url: '/jamguru',
+      })).catch(() => {})
+  }
 }
 
 module.exports = { recomputeScores, FEEDBACK_TAGS, todayDate, thisMonthStart };
