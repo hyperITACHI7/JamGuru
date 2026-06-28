@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, Play, Pause, Heart, Music, Users, ChevronRight, ThumbsDown,
   Sparkles, Send, X, Plus, Search, ChevronLeft, ListMusic, Reply,
@@ -13,7 +14,6 @@ import { getPlaylists, getPlaylist } from '../api/auth'
 import { REQUEST_TEMPLATES, renderTemplate } from '../data/requestTemplates'
 import { getGroupAiSuggestion, rankForGroupRequest } from '../phase7/api/ai'
 import { usePlayer } from '../context/PlayerContext'
-import GroupMembersSheet from '../components/GroupMembersSheet'
 
 function formatTime(iso) {
   const d    = new Date(iso)
@@ -235,10 +235,10 @@ function GroupRequestBubble({ msg, onPickSong }) {
 }
 
 export default function GroupConversationView({ group, onBack }) {
+  const navigate = useNavigate()
   const [messages, setMessages]   = useState([])
   const [loading, setLoading]     = useState(true)
   const [liking, setLiking]       = useState(null)
-  const [showMembers, setShowMembers] = useState(false)
 
   // Compose: AI suggest
   const [suggesting, setSuggesting]   = useState(false)
@@ -506,7 +506,7 @@ export default function GroupConversationView({ group, onBack }) {
         <button onClick={onBack} className="text-[#B3B3B3] hover:text-white transition-colors p-1 -ml-1">
           <ArrowLeft size={18} />
         </button>
-        <button onClick={() => setShowMembers(true)}
+        <button onClick={() => navigate(`/groups/${group.id}`)}
           className="flex items-center gap-3 flex-1 min-w-0 text-left hover:opacity-80 transition-opacity">
           <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-purple-500 to-violet-700 flex items-center justify-center flex-shrink-0">
             <Users size={15} className="text-white" />
@@ -514,14 +514,12 @@ export default function GroupConversationView({ group, onBack }) {
           <div className="min-w-0">
             <p className="text-white font-semibold text-sm leading-tight">{group.name}</p>
             <p className="text-[#B3B3B3] text-xs">
-              {group.memberCount ?? group._count?.members ?? 0} members · tap to see
+              {group.memberCount ?? group._count?.members ?? 0} members · tap to view
             </p>
           </div>
           <ChevronRight size={14} className="text-[#535353] flex-shrink-0 ml-auto" />
         </button>
       </div>
-
-      {showMembers && <GroupMembersSheet group={group} onClose={() => setShowMembers(false)} />}
 
       {/* Feed */}
       <div className="flex-1 overflow-y-auto py-4">
