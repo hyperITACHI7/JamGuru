@@ -67,17 +67,8 @@ async function recomputeScores(prisma, { recommendationId, likerId }) {
   // Rewards consistent daily quality; someone who sent 1 rec once can't permanently
   // outrank someone sending great picks every day.
 
-  // DM recs: recipientId = likerId
-  // Group recs: groupId set + liker is a member of that group
   const allRecs = await prisma.recommendation.findMany({
-    where: {
-      senderId,
-      sentAt: { gte: monthStart },
-      OR: [
-        { recipientId: likerId },
-        { groupId: { not: null }, group: { members: { some: { userId: likerId } } } },
-      ],
-    },
+    where: { senderId, recipientId: likerId, sentAt: { gte: monthStart } },
     select: { id: true, sentAt: true },
   });
 

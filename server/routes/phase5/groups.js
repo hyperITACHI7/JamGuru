@@ -2,7 +2,6 @@ const express = require('express');
 const { PrismaClient } = require('@prisma/client');
 const auth = require('../../middleware/auth');
 const { recomputeGroupScore, todayDate } = require('../../services/phase5/groupScoring');
-const { recomputeScores } = require('../../services/phase4/scoring');
 const { notifyMany } = require('../../sse');
 
 const router = express.Router();
@@ -322,10 +321,8 @@ router.post('/:id/recommendations/:recId/like', auth, async (req, res) => {
       throw e;
     }
 
-    await Promise.all([
-      recomputeGroupScore(prisma, { groupId: req.params.id, recommendationId: req.params.recId }),
-      recomputeScores(prisma, { recommendationId: req.params.recId, likerId: req.userId }),
-    ]);
+    // Update group score only — no personal trust ranking changes
+    await recomputeGroupScore(prisma, { groupId: req.params.id, recommendationId: req.params.recId });
 
     const likeCount = await prisma.like.count({ where: { recommendationId: req.params.recId } });
     res.json({ liked: true, likeCount, likeId: like.id });
@@ -349,10 +346,7 @@ router.delete('/:id/recommendations/:recId/like', auth, async (req, res) => {
     if (!like) return res.status(404).json({ error: 'Like not found' });
 
     await prisma.like.delete({ where: { id: like.id } });
-    await Promise.all([
-      recomputeGroupScore(prisma, { groupId: req.params.id, recommendationId: req.params.recId }),
-      recomputeScores(prisma, { recommendationId: req.params.recId, likerId: req.userId }),
-    ]);
+    await recomputeGroupScore(prisma, { groupId: req.params.id, recommendationId: req.params.recId });
 
     const likeCount = await prisma.like.count({ where: { recommendationId: req.params.recId } });
     res.json({ liked: false, likeCount });
