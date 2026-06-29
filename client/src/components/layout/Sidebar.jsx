@@ -204,7 +204,10 @@ export default function Sidebar({ collapsed, setCollapsed }) {
               <div className="w-10 h-10 flex-shrink-0 rounded bg-[#282828] flex items-center justify-center">
                 <Plus size={14} className="text-[#B3B3B3]" />
               </div>
-              <p className="text-[#B3B3B3] text-sm">Import playlist</p>
+              <div>
+                <p className="text-[#B3B3B3] text-sm">Import playlist</p>
+                <p className="text-[#535353] text-xs mt-0.5">Shapes your taste profile</p>
+              </div>
             </button>
           )}
         </div>
