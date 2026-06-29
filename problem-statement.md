@@ -122,14 +122,42 @@ A new section inside Spotify that functions similarly to a DM inbox — but its 
 > **Important note on "DMs":** This feature is referred to as DMs for convenience, but it is not a general messaging tool. There is no free-text input by default. A short message field only appears *after* a user selects a song to send, allowing them to attach a brief context or description alongside the recommendation.
 
 Users can:
-- Recommend songs to individual friends.
+- Recommend songs to individual friends — selecting multiple friends at once for batch sharing in a single action.
 - Recommend songs to groups.
 - Add optional context explaining why they are recommending the song.
+- Open a per-friend **Conversation View** — a threaded, chronological history of all songs shared with that friend, displayed as chat bubbles for quick scanning of the full recommendation history.
 
 Examples of context:
 - "Perfect for late-night drives."
 - "The guitar solo is insane."
 - "Sounds like old Arctic Monkeys."
+
+---
+
+### Personal Music Library
+
+Before users can share or receive AI suggestions, JamGuru needs to know their taste. This is seeded through their existing Spotify library.
+
+**Spotify Account Linking**
+
+Users connect their Spotify account via OAuth. This grants JamGuru read-access to their liked songs and playlists. Tokens are stored securely and refreshed automatically in the background.
+
+**Liked Songs Sync**
+
+Once linked, users sync their Spotify Liked Songs with a single tap. These songs are imported into JamGuru's local database and form the foundation of the user's taste profile. The sync can be refreshed at any time to pull in newly liked tracks.
+
+**Playlist Import**
+
+Users can also import any public or private Spotify playlist by pasting its URL. Imported playlists appear in the Library section of the sidebar and on the Library page.
+
+> **Why import playlists?** Imported playlists serve two purposes: they appear in the library for browsing, and — more importantly — they shape the user's taste profile and seed the AI suggestion pool. A playlist import is a declaration of musical identity.
+
+**Library Page**
+
+The Library page displays:
+- A "Liked Songs" collection (all synced tracks).
+- All imported playlists with cover art, name, and song count.
+- A persistent "Import playlist" entry point with the label "Shapes your taste profile" to communicate its purpose to new users.
 
 ---
 
@@ -331,6 +359,10 @@ Score = 10 / (2 × 20) = 0.25
 
 Group scores only affect standings within that specific group.
 
+#### Group Taste Profile
+
+Each group maintains a collective taste profile — a shared set of genres, moods, eras, and artists derived from member interactions and group activity. This profile can be set manually by any group member or generated automatically by AI based on the group's recommendation history. The group taste profile is used to inform AI song suggestions made within the group context.
+
 ---
 
 ### Anti-Spam Design
@@ -347,9 +379,18 @@ Instead, the scoring formula naturally discourages spam: low-quality recommendat
 
 ---
 
-### Recommendation Feedback
+### Recommendation Feedback & Actions
 
-When a user likes a recommendation, they can optionally explain why it resonated. Examples:
+When a user receives a recommendation, they have several ways to respond.
+
+**Like**
+
+The primary positive action. Liking a recommendation:
+- Updates the sender's daily and monthly discovery scores.
+- Updates the liker's personal trust ranking for that sender.
+- Optionally triggers a tag feedback prompt.
+
+After liking, a row of tag chips appears on the recommendation card. Tags describe why the song resonated. Examples:
 
 - Great vocals
 - Gym song
@@ -357,23 +398,104 @@ When a user likes a recommendation, they can optionally explain why it resonated
 - Amazing lyrics
 - Perfect road trip vibe
 
-This feedback serves two purposes:
-1. Improves the quality of future recommendations between those two users.
-2. Builds a richer shared understanding of each other's music taste over time.
+Users can select multiple tags or none. These tags serve two purposes:
+1. Improve the quality of future recommendations between those two users.
+2. Build richer context for AI suggestions over time.
+
+**Dismiss**
+
+Soft-hides a recommendation from the default inbox view without any scoring effect. The recommendation is not deleted — it can be un-dismissed. Dismiss is appropriate when the user simply isn't interested at the moment but doesn't want to penalize the sender.
+
+**Dislike**
+
+Signals that the recommendation genuinely missed the mark. The item is removed from the inbox and the signal is fed into the recipient's taste profile as a negative data point. Dislike does **not** penalize the sender's JamGuru score — it is purely a personal taste signal, not a social punishment.
+
+Both dismiss and dislike are reversible with an immediate undo action.
+
+---
+
+### Song Requests
+
+Beyond pushing recommendations, users can pull — requesting specific types of songs from friends.
+
+**Templated Requests**
+
+Rather than a free-text field (which creates friction and ambiguity), requests use structured templates with fill-in-the-blank placeholders. Six templates cover the most common request scenarios:
+
+1. "Send me something good for **[mood/activity]**"
+2. "I'm looking for something that sounds like **[artist/genre]**"
+3. "What's a good **[era]** track I should know?"
+4. "Recommend me something for **[occasion]**"
+5. "I've been listening to a lot of **[genre]** lately — what's next?"
+6. "Find me something that fits **[descriptor]**"
+
+A tag picker lets the user fill in each placeholder from a curated set of options, reducing typing and making requests scannable at a glance.
+
+**Receiving a Request**
+
+When a friend sends a request, it appears in the conversation view with a "Pick a song" call-to-action. The recipient opens a reply picker that presents three sections:
+
+1. **AI Suggestions** — AI ranks and suggests songs matching the request text, drawing from the recipient's library and generating external suggestions.
+2. **Your Library** — the recipient's liked songs and playlists, ranked by AI relevance to the request.
+3. **Search** — standard Spotify song search for anything not in the library.
+
+Group song requests work identically but are broadcast to all group members; any member can fulfill the request.
 
 ---
 
 ### AI Integration
 
-AI should not exist for the sake of AI. Potential future roles within JamGuru:
+AI should not exist for the sake of AI. Every AI feature in JamGuru is designed to solve a specific friction point in the discovery or sharing flow — not to add complexity.
 
-- Understand *why* recommendations between two specific users have succeeded historically.
-- Extract taste patterns from feedback tags and listening behavior.
-- Identify recurring recommendation themes and moods for a user pair.
+#### Taste Profile
 
-**Primary AI feature:** When opening a music-sharing thread with any friend, a **"Recommend with AI"** button is available. Based on data collected *only between those two users* (their shared history, feedback, and mutual listening patterns), the AI suggests a song that the sender likes and the recipient is likely to enjoy.
+The foundation for all AI features is the **taste profile** — a structured summary of each user's musical identity, expressed as:
 
-This keeps AI suggestions personal and contextual, not generic — the AI acts as an assistant to human judgment, not a replacement for it.
+- **Genres** (e.g., "Indie Rock", "Lo-Fi Hip Hop", "Afrobeats")
+- **Moods** (e.g., "Melancholic", "Energetic", "Chill")
+- **Eras** (e.g., "90s", "2010s", "Classic")
+- **Artists** (anchor artists that represent the user's taste)
+
+The taste profile is generated by AI from the user's liked songs and imported playlists, and can be edited manually or refreshed on demand. Groups have their own collective taste profile derived from member interactions and group feed history.
+
+Tags are split into two categories:
+- **Pinned** — manually added or confirmed by the user; never auto-removed.
+- **AI-Discovered** — generated by the AI; the user can promote to pinned or dismiss them.
+
+#### Personalized Home ("Picked For You")
+
+When the user opens the Home page, a "Picked For You" section presents 3 daily AI-generated discovery picks — songs the user is likely to enjoy based on their taste profile and liked song history. Each call uses a randomly selected discovery angle (e.g., "similar mood to recently liked songs", "exploring an adjacent genre", "hidden gem from a familiar artist") to ensure variety across sessions.
+
+#### AI Suggest in DMs (Library-First)
+
+When a user opens a conversation with a friend, an "AI Suggest" button is available. On click, JamGuru:
+
+1. **Library-first pass**: Searches the sender's liked songs and imported playlists for a song that matches the friend's taste profile. If a strong match is found, it is returned immediately — no external AI call needed.
+2. **Fallback to external AI**: If the library yields no confident match, the AI generates a song suggestion based on the friend's taste profile and the mutual recommendation history between the two users.
+
+The suggested song card remains visible during refresh rather than disappearing. A spinner on the refresh button communicates that a new suggestion is loading. Each suggestion is tracked in a session-level exclusion set so the same song is never suggested twice in the same conversation session.
+
+#### AI Suggest in Groups
+
+The same library-first approach applies within groups, using the group's collective taste profile instead of a single friend's profile. If the group has no taste profile yet, the AI falls back to analyzing recent group feed history.
+
+#### AI-Powered Request Fulfillment
+
+When responding to a song request, the reply picker's AI section is powered by two parallel operations:
+- **Ranking**: the recipient's library is ranked by AI relevance to the request text.
+- **Generation**: the AI generates up to 3 external song suggestions that match the request.
+
+Both sets are merged, deduplicated, and presented in a combined reply picker.
+
+#### AI Predict (Friend-Song Matching)
+
+In the Share Panel, an "AI Predict" button ranks the user's friends by taste compatibility with the song being shared. This helps the sender quickly identify which friends are most likely to love the pick, making multi-friend sharing more intentional rather than broadcast.
+
+#### AI Infrastructure
+
+All AI calls route through a provider-agnostic wrapper that supports Groq, any OpenAI-compatible endpoint, or Anthropic Claude — configured via environment variables. This allows the AI backend to be swapped without touching feature code.
+
+**Last.fm tag enrichment** runs asynchronously in the background for every newly cached song. It fetches genre and mood tags from Last.fm and stores them on the song record. These tags feed into AI prompts, improving suggestion quality without requiring manual tagging.
 
 ---
 
@@ -386,7 +508,9 @@ This keeps AI suggestions personal and contextual, not generic — the AI acts a
 | Session starts from Discovery Inbox | 20% of JamGuru-engaged users open Spotify via a feed notification |
 | Retention lift (30-day) for JamGuru users vs. control | +8 percentage points |
 | JamGuru title earned per active group | At least 1 per group of 3+ users within 4 weeks |
-| AI recommendation adoption | 15% of threads use "Recommend with AI" at least once per month |
+| AI suggestion adoption | 15% of DM threads use "AI Suggest" at least once per month |
+| Song request completion rate | > 50% of sent requests receive a song reply within 48 hours |
+| Library import rate | 40% of active users import at least one playlist within the first week |
 
 ---
 
@@ -396,10 +520,12 @@ This keeps AI suggestions personal and contextual, not generic — the AI acts a
 |---|---|
 | Spam prevention cap | No cap needed. The scoring formula naturally penalizes low-quality spam — sending songs that get no likes hurts the sender's daily score. |
 | Cold start (few Spotify friends) | Implement both: contacts import + in-app "find friends" by username search. |
-| Notification fatigue | No device notifications in the prototype. |
+| Notification fatigue | Real-time in-app updates delivered via Server-Sent Events (SSE). Web Push notifications sent for key events (new recommendations, likes, group activity) when the user is away from the app. |
 | Score decay | No decay. Monthly reset handles freshness — each new month starts at zero. |
 | JamGuru-for count visibility | Visible on public profile (e.g., "JamGuru for 12 listeners"). |
 | Group scores affecting JamGuru | No. JamGuru score is strictly 1:1. Group scores are fully isolated and affect nothing outside the group. |
+| Dislike impact on sender | Dislikes are personal taste signals only. They update the recipient's taste profile but do not affect the sender's discovery score or JamGuru standing. |
+| Request templates vs. free text | Structured templates with tag pickers. Reduces friction, makes requests scannable, and gives AI better-structured input for generating relevant suggestions. |
 
 ---
 
@@ -407,6 +533,8 @@ This keeps AI suggestions personal and contextual, not generic — the AI acts a
 
 JamGuru transforms Spotify from a platform that *recommends music to users* into a platform where *trusted people help each other discover music*.
 
-The key innovation is not the scoring system. The key innovation is the creation of a **lightweight trust network** where music discovery happens through people rather than purely through algorithms. JamGuru makes that trust visible — a named, earned relationship that represents consistent, meaningful discovery between two people. The AI layer then helps surface discovery opportunities that might otherwise be missed, using the history of that specific relationship as its only input.
+The key innovation is not the scoring system. The key innovation is the creation of a **lightweight trust network** where music discovery happens through people rather than purely through algorithms. JamGuru makes that trust visible — a named, earned relationship that represents consistent, meaningful discovery between two people.
+
+The AI layer then amplifies discovery in multiple directions: personalizing the home feed, suggesting the right song for a specific friend, matching songs to requests, and helping users understand their own taste. Critically, the AI always operates with the history of specific relationships and personal libraries as its primary input — it acts as an assistant to human judgment, not a replacement for it.
 
 Together, these systems create a discovery ecosystem focused on **increasing meaningful song discovery** rather than increasing recommendation volume.
