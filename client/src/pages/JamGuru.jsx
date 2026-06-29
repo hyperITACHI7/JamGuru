@@ -44,22 +44,24 @@ export default function JamGuru() {
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      {/* Gradient header — full width */}
-      <div className="relative flex-shrink-0">
-        <div className="absolute inset-0 bg-gradient-to-b from-emerald-900/70 via-[#121212]/60 to-transparent pointer-events-none" />
-        <TopBar
-          transparent
-          rightExtra={
-            <button
-              className="md:hidden w-9 h-9 rounded-full bg-[#282828] hover:bg-[#3e3e3e] flex items-center justify-center transition-colors"
-              onClick={() => setShowMobileMessages(true)}
-              title="Messages"
-            >
-              <MessageCircle size={18} className="text-white" />
-            </button>
-          }
-        />
-      </div>
+      {/* Gradient header — only show when NOT inside a DM/group chat */}
+      {!selectedEntity && (
+        <div className="relative flex-shrink-0">
+          <div className="absolute inset-0 bg-gradient-to-b from-emerald-900/70 via-[#121212]/60 to-transparent pointer-events-none" />
+          <TopBar
+            transparent
+            rightExtra={
+              <button
+                className="md:hidden w-9 h-9 rounded-full bg-[#282828] hover:bg-[#3e3e3e] flex items-center justify-center transition-colors"
+                onClick={() => setShowMobileMessages(true)}
+                title="Messages"
+              >
+                <MessageCircle size={18} className="text-white" />
+              </button>
+            }
+          />
+        </div>
+      )}
 
       {/* Mobile messages — full screen takeover */}
       {showMobileMessages && (
@@ -88,12 +90,12 @@ export default function JamGuru() {
           {selectedEntity?.type === 'friend' ? (
             <ConversationView
               friend={selectedEntity.data}
-              onBack={() => setSelectedEntity(null)}
+              onBack={() => { setSelectedEntity(null); setShowMobileMessages(true) }}
             />
           ) : selectedEntity?.type === 'group' ? (
             <GroupConversationView
               group={selectedEntity.data}
-              onBack={() => setSelectedEntity(null)}
+              onBack={() => { setSelectedEntity(null); setShowMobileMessages(true) }}
             />
           ) : (
             <div className="h-full overflow-y-auto px-6 pb-8">

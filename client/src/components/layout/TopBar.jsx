@@ -39,7 +39,7 @@ export default function TopBar({ transparent = false, rightExtra = null }) {
       <div className="flex items-center">
         {parentRoute ? (
           <button
-            onClick={() => navigate(parentRoute)}
+            onClick={() => window.history.length > 1 ? navigate(-1) : navigate(parentRoute)}
             className="w-8 h-8 rounded-full bg-black/60 flex items-center justify-center text-white hover:bg-black/80 transition-colors"
           >
             <ChevronLeft size={18} />
