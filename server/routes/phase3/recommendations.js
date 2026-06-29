@@ -95,7 +95,15 @@ router.post('/', auth, async (req, res) => {
 router.get('/inbox', auth, async (req, res) => {
   try {
     const recs = await prisma.recommendation.findMany({
-      where: { recipientId: req.userId, dismissedAt: null },
+      where: {
+        recipientId: req.userId,
+        dismissedAt: null,
+        // Only show songs the recipient hasn't discovered yet
+        song: {
+          songLikes:    { none: { userId: req.userId } },
+          playlistSongs: { none: { playlist: { userId: req.userId } } },
+        },
+      },
       include: {
         song: true,
         sender: { select: SAFE_USER },
@@ -103,7 +111,7 @@ router.get('/inbox', auth, async (req, res) => {
         _count: { select: { likes: true } },
       },
       orderBy: { sentAt: 'desc' },
-      take: 50,
+      take: 100,
     });
 
     let mapped = recs.map(r => ({

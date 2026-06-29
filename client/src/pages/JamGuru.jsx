@@ -10,6 +10,36 @@ import GroupConversationView from './GroupConversationView'
 import { getInbox } from '../phase3/api/recommendations'
 import { getJamGuruCount } from '../phase4/api/jamguru'
 
+function groupByTime(recs) {
+  const now   = new Date()
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const yesterday = new Date(today.getTime() - 86400000)
+  const dow = today.getDay()
+  const startOfThisWeek = new Date(today.getTime() - (dow === 0 ? 6 : dow - 1) * 86400000)
+  const startOfLastWeek = new Date(startOfThisWeek.getTime() - 7 * 86400000)
+
+  const buckets = [
+    { label: 'Today',     recs: [] },
+    { label: 'Yesterday', recs: [] },
+    { label: 'This Week', recs: [] },
+    { label: 'Last Week', recs: [] },
+    { label: 'Earlier',   recs: [] },
+  ]
+
+  for (const rec of recs) {
+    const d   = new Date(rec.sentAt)
+    const day = new Date(d.getFullYear(), d.getMonth(), d.getDate())
+    const t   = day.getTime()
+    if (t === today.getTime())         buckets[0].recs.push(rec)
+    else if (t === yesterday.getTime()) buckets[1].recs.push(rec)
+    else if (day >= startOfThisWeek)   buckets[2].recs.push(rec)
+    else if (day >= startOfLastWeek)   buckets[3].recs.push(rec)
+    else                               buckets[4].recs.push(rec)
+  }
+
+  return buckets.filter(b => b.recs.length > 0)
+}
+
 export default function JamGuru() {
   const [inbox, setInbox]                     = useState([])
   const [loading, setLoading]                 = useState(true)
@@ -173,7 +203,7 @@ export default function JamGuru() {
                     <h2 className="text-white font-bold text-lg">
                       All Recommendations
                       <span className="text-[#B3B3B3] font-normal text-sm ml-3">
-                        {inbox.length} song{inbox.length !== 1 ? 's' : ''}
+                        {inbox.length} new
                       </span>
                     </h2>
                     <div className="flex items-center gap-2">
@@ -200,11 +230,26 @@ export default function JamGuru() {
                       </div>
                     </div>
                   </div>
-                  <div className="space-y-3">
-                    {inbox.map(rec => (
-                      <RecommendationCard key={rec.id} rec={rec} />
-                    ))}
-                  </div>
+                  {sort === 'latest' ? (
+                    groupByTime(inbox).map(group => (
+                      <div key={group.label} className="mb-6">
+                        <p className="text-[#B3B3B3] text-[11px] font-bold uppercase tracking-widest mb-3">
+                          {group.label}
+                        </p>
+                        <div className="space-y-3">
+                          {group.recs.map(rec => (
+                            <RecommendationCard key={rec.id} rec={rec} />
+                          ))}
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="space-y-3">
+                      {inbox.map(rec => (
+                        <RecommendationCard key={rec.id} rec={rec} />
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
