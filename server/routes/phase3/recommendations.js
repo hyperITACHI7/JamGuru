@@ -163,8 +163,9 @@ router.get('/pending-count', auth, async (req, res) => {
   try {
     const count = await prisma.recommendation.count({
       where: {
-        recipientId: req.userId,
-        dismissedAt: null,
+        recipientId:   req.userId,
+        preDiscovered: false,
+        dismissedAt:   null,
         likes: { none: { likerId: req.userId } },
       },
     });
@@ -215,17 +216,18 @@ router.get('/conversation/:friendId', auth, async (req, res) => {
 
     const fmt = (recs, dir) =>
       recs.map(r => ({
-        type:      'recommendation',
-        id:        r.id,
-        sentAt:    r.sentAt,
-        direction: dir,
-        song:      r.song,
-        context:   r.context,
-        requestId: r.requestId ?? null,
-        liked:     r.likes.length > 0,
-        likeId:    r.likes[0]?.id ?? null,
-        tags:      r.likes[0]?.feedbacks?.map(f => f.tag) ?? [],
-        dismissed: !!r.dismissedAt,
+        type:          'recommendation',
+        id:            r.id,
+        sentAt:        r.sentAt,
+        direction:     dir,
+        song:          r.song,
+        context:       r.context,
+        requestId:     r.requestId ?? null,
+        liked:         r.likes.length > 0,
+        likeId:        r.likes[0]?.id ?? null,
+        tags:          r.likes[0]?.feedbacks?.map(f => f.tag) ?? [],
+        dismissed:     !!r.dismissedAt,
+        preDiscovered: !!r.preDiscovered,
       }));
 
     const messages = [

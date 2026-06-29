@@ -182,9 +182,9 @@ The JamGuru card is visually separated so users immediately understand: this is 
 
 **Section 2 — Discovery Messages**
 
-Below the JamGuru section is the full recommendation inbox. Users can sort by:
-- Latest recommendation.
-- Recommendation score.
+Below the JamGuru section is the full recommendation inbox. By default it is sorted by **recommendation score** (sender trust score, highest first) so the song the user is most likely to enjoy appears at the top. The user can also switch to chronological order.
+
+**Pre-discovered filtering:** If a friend sends a song the recipient has already liked, added to a playlist, or otherwise discovered, that recommendation is automatically filtered out of the All Recommendations view. It still appears in the per-friend DM conversation thread (because the friend did send it and it's part of the conversation history), but it is rendered quietly — dimmed with an "Already in your library" label — and does not show action buttons or increment the inbox badge. The inbox only surfaces songs that are genuinely new to the user.
 
 ---
 
@@ -359,6 +359,8 @@ Score = 10 / (2 × 20) = 0.25
 
 Group scores only affect standings within that specific group.
 
+Group recommendations are intentionally secondary — they exist to enable discovery in a shared space, not to clutter a user's personal inbox. Group recs never appear in the All Recommendations section of the Discovery Inbox. They are only accessible through the Group Conversation View. This keeps the personal inbox clean and focused on 1:1 trusted picks.
+
 #### Group Taste Profile
 
 Each group maintains a collective taste profile — a shared set of genres, moods, eras, and artists derived from member interactions and group activity. This profile can be set manually by any group member or generated automatically by AI based on the group's recommendation history. The group taste profile is used to inform AI song suggestions made within the group context.
@@ -386,6 +388,7 @@ When a user receives a recommendation, they have several ways to respond.
 **Like**
 
 The primary positive action. Liking a recommendation:
+- Adds the song to the liker's personal Liked Songs library (if not already there).
 - Updates the sender's daily and monthly discovery scores.
 - Updates the liker's personal trust ranking for that sender.
 - Optionally triggers a tag feedback prompt.
@@ -398,7 +401,9 @@ After liking, a row of tag chips appears on the recommendation card. Tags descri
 - Amazing lyrics
 - Perfect road trip vibe
 
-Users can select multiple tags or none. These tags serve two purposes:
+Users can select multiple tags or none. The tag picker is available both in the All Recommendations view and in the DM conversation view. Tags are stored against the like record and are visible to the sender when they open the conversation — so a tag added from All Recommendations still appears in the DM thread.
+
+These tags serve two purposes:
 1. Improve the quality of future recommendations between those two users.
 2. Build richer context for AI suggestions over time.
 
@@ -470,8 +475,8 @@ When the user opens the Home page, a "Picked For You" section presents 3 daily A
 
 When a user opens a conversation with a friend, an "AI Suggest" button is available. On click, JamGuru:
 
-1. **Library-first pass**: Searches the sender's liked songs and imported playlists for a song that matches the friend's taste profile. If a strong match is found, it is returned immediately — no external AI call needed.
-2. **Fallback to external AI**: If the library yields no confident match, the AI generates a song suggestion based on the friend's taste profile and the mutual recommendation history between the two users.
+1. **Library-first pass**: Searches the sender's liked songs and imported playlists for a song that matches the friend's taste profile. Before ranking, songs that the **recipient** has already liked, discovered, or received are filtered out — the goal is to surface something genuinely new to them, not something they already know.
+2. **Fallback to external AI**: If the library yields no confident match, the AI generates a song suggestion based on the friend's taste profile and the mutual recommendation history between the two users. The AI prompt includes a NEVER list of songs the recipient already knows and songs already suggested this session.
 
 The suggested song card remains visible during refresh rather than disappearing. A spinner on the refresh button communicates that a new suggestion is loading. Each suggestion is tracked in a session-level exclusion set so the same song is never suggested twice in the same conversation session.
 

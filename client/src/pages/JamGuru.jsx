@@ -51,7 +51,7 @@ export default function JamGuru() {
   const [showMobileMessages, setShowMobileMessages] = useState(false)
   const [refreshing, setRefreshing]           = useState(false)
   const [error, setError]                     = useState(null)
-  const [sort, setSort]                       = useState('latest')
+  const [sort, setSort]                       = useState('score')
   const [jamGuruForCount, setJamGuruForCount] = useState(0)
   // selectedEntity: null | { type: 'friend'|'group', data: {...} }
   const [selectedEntity, setSelectedEntity]   = useState(null)

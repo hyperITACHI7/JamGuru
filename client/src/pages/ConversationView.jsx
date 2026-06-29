@@ -59,10 +59,11 @@ function Bubble({ msg, onLike, justLiked, requestText }) {
   const isReply = !!msg.requestId
   const [reaction, setReaction] = useState(msg.dismissed ? 'dismiss' : null)
 
-  const tagPickerOpen = justLiked && !!msg.likeId
-  const dismissActive = reaction === 'dismiss'
-  const dislikeActive = reaction === 'dislike'
-  const anyReaction   = dismissActive || dislikeActive
+  const tagPickerOpen   = justLiked && !!msg.likeId
+  const dismissActive   = reaction === 'dismiss'
+  const dislikeActive   = reaction === 'dislike'
+  const anyReaction     = dismissActive || dislikeActive
+  const isPreDiscovered = !isSent && !!msg.preDiscovered
 
   async function handleDismiss() {
     try {
@@ -86,7 +87,7 @@ function Bubble({ msg, onLike, justLiked, requestText }) {
         isSent
           ? isReply ? 'bg-[#1DB954]/20 rounded-tr-sm' : 'bg-[#1DB954]/15 rounded-tr-sm'
           : isReply ? 'bg-[#2e2e2e] rounded-tl-sm' : 'bg-[#282828] rounded-tl-sm'
-      } ${dislikeActive ? 'opacity-60' : ''}`}>
+      } ${dislikeActive || isPreDiscovered ? 'opacity-50' : ''}`}>
 
         {/* Reply quote block — WhatsApp / Instagram style */}
         {isReply && requestText && (
@@ -123,14 +124,16 @@ function Bubble({ msg, onLike, justLiked, requestText }) {
                   {playing ? <Pause size={10} fill="currentColor" /> : <Play size={10} fill="currentColor" />}
                 </button>
               )}
-              <button onClick={() => onLike(msg)} disabled={anyReaction}
-                className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${
-                  msg.liked ? 'text-[#1DB954] hover:text-red-400'
-                    : anyReaction ? 'text-[#333] cursor-not-allowed'
-                    : 'text-[#B3B3B3] hover:text-white'
-                }`}>
-                <Heart size={14} fill={msg.liked ? 'currentColor' : 'none'} />
-              </button>
+              {!isPreDiscovered && (
+                <button onClick={() => onLike(msg)} disabled={anyReaction}
+                  className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${
+                    msg.liked ? 'text-[#1DB954] hover:text-red-400'
+                      : anyReaction ? 'text-[#333] cursor-not-allowed'
+                      : 'text-[#B3B3B3] hover:text-white'
+                  }`}>
+                  <Heart size={14} fill={msg.liked ? 'currentColor' : 'none'} />
+                </button>
+              )}
             </div>
           ) : (
             msg.song.previewUrl && (
@@ -159,7 +162,11 @@ function Bubble({ msg, onLike, justLiked, requestText }) {
           </div>
         )}
 
-        {!isSent && (
+        {!isSent && isPreDiscovered && (
+          <p className="text-[#535353] text-[9px] mt-1.5">Already in your library</p>
+        )}
+
+        {!isSent && !isPreDiscovered && (
           <>
             {msg.liked && !justLiked && msg.tags.length > 0 && (
               <div className="flex flex-wrap gap-1 mt-2 mb-1">
