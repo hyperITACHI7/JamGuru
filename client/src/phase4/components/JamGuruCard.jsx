@@ -54,7 +54,7 @@ export default function JamGuruCard() {
         </p>
         <p className="text-white font-bold text-lg leading-tight">{jamguru.displayName}</p>
         <p className="text-[#B3B3B3] text-xs mt-0.5">
-          {discoveryCount} discovery{discoveryCount !== 1 ? 'ies' : ''} you loved this month
+          {discoveryCount} {discoveryCount !== 1 ? 'discoveries' : 'discovery'} you loved this month
         </p>
       </div>
     </div>
