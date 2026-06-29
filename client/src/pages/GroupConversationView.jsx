@@ -199,8 +199,9 @@ function GroupMessage({ msg, onLikeToggle, requestText }) {
 }
 
 function GroupRequestBubble({ msg, onPickSong }) {
-  const me   = JSON.parse(localStorage.getItem('user') || '{}')
-  const isMe = msg.senderId === me.id
+  const me     = JSON.parse(localStorage.getItem('user') || '{}')
+  const sender = msg.sender ?? { displayName: 'Deleted user' }
+  const isMe   = msg.senderId === me.id
   return (
     <div className={`flex ${isMe ? 'justify-end' : 'justify-start'} mb-4 px-4`}>
       {!isMe && (
