@@ -184,7 +184,11 @@ The JamGuru card is visually separated so users immediately understand: this is 
 
 Below the JamGuru section is the full recommendation inbox. By default it is sorted by **recommendation score** (sender trust score, highest first) so the song the user is most likely to enjoy appears at the top. The user can also switch to chronological order.
 
-**Pre-discovered filtering:** If a friend sends a song the recipient has already liked, added to a playlist, or otherwise discovered, that recommendation is automatically filtered out of the All Recommendations view. It still appears in the per-friend DM conversation thread (because the friend did send it and it's part of the conversation history), but it is rendered quietly — dimmed with an "Already in your library" label — and does not show action buttons or increment the inbox badge. The inbox only surfaces songs that are genuinely new to the user.
+**Pre-discovered filtering:** If a friend sends a song the recipient has already liked, added to a playlist, or otherwise discovered, that recommendation is automatically filtered out of the All Recommendations view. It still appears in the per-friend DM conversation thread (because the friend did send it and it's part of the conversation history), but it is rendered quietly — dimmed with an "Already in your library" label — and does not show action buttons or increment the inbox badge.
+
+**Prior-feedback treatment:** If a friend sends a song the recipient has previously *disliked or dismissed* via an earlier recommendation, the card is treated differently from both pre-discovered songs and normal new recommendations. The entire card is grayed out in the DM thread with a "Not my vibe" label (disliked) or "Not for me" label (dismissed). No action buttons are shown. A **Reconsider** button lets the recipient clear this state and re-evaluate the song fresh — once tapped, the card re-enables and the full action buttons (like / dismiss / dislike) reappear. The sender's view of that same sent bubble reflects the prior reaction state, labelled as "Not [recipient's name]'s vibe" or "Not for [recipient's name]" so the sender understands why the song appears unresponded-to.
+
+The inbox only surfaces songs that are genuinely new to the user with no prior negative reaction.
 
 ---
 
@@ -415,7 +419,29 @@ Soft-hides a recommendation from the default inbox view without any scoring effe
 
 Signals that the recommendation genuinely missed the mark. The item is removed from the inbox and the signal is fed into the recipient's taste profile as a negative data point. Dislike does **not** penalize the sender's JamGuru score — it is purely a personal taste signal, not a social punishment.
 
+Disliking a song also removes it from the user's Liked Songs and from any imported playlists it appeared in. This keeps the library consistent: a song that has been explicitly rejected cannot simultaneously sit in the user's collection.
+
 Both dismiss and dislike are reversible with an immediate undo action.
+
+---
+
+### Liked Songs Management
+
+The Liked Songs page lists all songs in the user's library with a persistent unlike option on each track (a filled heart that turns red on hover). Clicking it removes the song from Liked Songs instantly — functioning as a "Reconsider" action for songs the user no longer wants in their collection, including songs that arrived there via a Spotify sync or playlist import.
+
+**Library integrity invariant:** Every song present in a user's imported playlist is also reflected in their Liked Songs. If a data inconsistency is ever detected (for example, a song in a playlist that was subsequently disliked via recommendation), the playlist entry takes precedence — the song is added back to Liked Songs and any conflicting dislike record is cleared.
+
+---
+
+### Already-Explored Sender Hints
+
+When a sender is browsing candidate songs to recommend — scrolling through their library, viewing AI suggestions in the reply picker, or searching Spotify — a small, non-blocking badge appears next to any song the recipient has already interacted with:
+
+- **"Already has it"** — recipient has liked this song or it exists in one of their imported playlists.
+- **"Already passed"** — recipient previously dismissed a recommendation of this song.
+- **"Not their vibe"** — recipient previously disliked a recommendation of this song.
+
+These badges are purely advisory. The sender can still select and send the song — for example, to resurface it with new context, or simply because they believe it deserves a second listen. The same badge appears on the compose preview card (the staged song shown before the sender confirms the send) so the signal is available at the moment of decision, not just during browsing.
 
 ---
 
