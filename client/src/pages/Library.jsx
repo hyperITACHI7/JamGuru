@@ -57,7 +57,7 @@ export default function Library() {
               </div>
               <div className="overflow-hidden">
                 <p className="text-white font-semibold text-base truncate">Import from Spotify</p>
-                <p className="text-[#B3B3B3] text-sm mt-0.5">Paste a playlist link</p>
+                <p className="text-[#B3B3B3] text-sm mt-0.5">Shapes your taste profile</p>
               </div>
             </Link>
           ) : (
@@ -87,7 +87,10 @@ export default function Library() {
                 <div className="w-16 h-16 flex-shrink-0 rounded-md bg-[#282828] flex items-center justify-center">
                   <Plus size={22} className="text-[#B3B3B3]" />
                 </div>
-                <p className="text-[#B3B3B3] text-sm font-medium">Import another playlist</p>
+                <div>
+                  <p className="text-[#B3B3B3] text-sm font-medium">Import another playlist</p>
+                  <p className="text-[#535353] text-xs mt-0.5">Shapes your taste profile</p>
+                </div>
               </Link>
             </div>
           )}
