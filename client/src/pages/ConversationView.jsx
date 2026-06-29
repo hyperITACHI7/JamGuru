@@ -739,7 +739,11 @@ export default function ConversationView({ friend, onBack }) {
                         <span className="text-[#535353] text-[9px]">{slotCount} tag{slotCount !== 1 ? 's' : ''}</span>
                       </div>
                       <p className="text-white text-xs leading-relaxed">
-                        {tmpl.template.replace(/\{(\w+)\}/g, (_, k) => `[${tmpl.placeholders[k]?.label ?? k}]`)}
+                        {tmpl.template.split(/(\{[^}]+\})/).map((part, i) => {
+                          const m = part.match(/^\{(\w+)\}$/)
+                          if (!m) return <span key={i}>{part}</span>
+                          return <span key={i} className="text-[#1DB954] font-semibold">{tmpl.placeholders[m[1]]?.label ?? m[1]}</span>
+                        })}
                       </p>
                     </button>
                   )
