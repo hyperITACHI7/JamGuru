@@ -13,7 +13,9 @@ import {
 import { getLikedSongs, searchSongs } from '../api/songs'
 import { getPlaylists, getPlaylist } from '../api/auth'
 import { sendSongRequest } from '../api/songRequests'
-import { REQUEST_TEMPLATES, renderTemplate } from '../data/requestTemplates'
+import { REQUEST_TEMPLATES, renderTemplate, joinTags } from '../data/requestTemplates'
+import TagPicker from '../components/TagPicker'
+import { getTaste } from '../api/taste'
 import { rankForRequest } from '../phase7/api/ai'
 import FeedbackTags from '../phase4/components/FeedbackTags'
 import { usePlayer } from '../context/PlayerContext'
@@ -28,19 +30,22 @@ function formatTime(iso) {
   return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
 }
 
-function renderTemplateWithPills(templateId, vars, cycleVar) {
+function renderTemplateWithPills(templateId, vars, openPicker) {
   const tmpl = REQUEST_TEMPLATES.find(t => t.id === templateId)
   if (!tmpl) return null
   const parts = tmpl.template.split(/(\{[^}]+\})/)
   return parts.map((part, i) => {
     const match = part.match(/^\{(\w+)\}$/)
     if (!match) return <span key={i}>{part}</span>
-    const key = match[1]
-    const ph  = tmpl.placeholders[key]
+    const key  = match[1]
+    const ph   = tmpl.placeholders[key]
+    const tags = vars[key] ?? ['any']
+    const display = tags.includes('any') ? `any ${ph?.label ?? key}` : joinTags(tags)
     return (
-      <button key={i} onClick={() => cycleVar(key, ph.options)}
-        className="inline-flex items-center gap-1 bg-[#1DB954]/20 border border-[#1DB954]/40 text-[#1DB954] text-xs font-semibold px-2 py-0.5 rounded-full hover:bg-[#1DB954]/30 transition-colors">
-        {vars[key]} <ChevronRight size={9} />
+      <button key={i} onClick={() => openPicker(key)}
+        className="inline-flex items-center gap-1 bg-[#1DB954]/20 border border-[#1DB954]/40 text-[#1DB954] text-xs font-semibold px-2 py-0.5 rounded-full hover:bg-[#1DB954]/30 transition-colors max-w-[180px]">
+        <span className="truncate">{display}</span>
+        <ChevronRight size={9} className="flex-shrink-0" />
       </button>
     )
   })
@@ -257,6 +262,8 @@ export default function ConversationView({ friend, onBack }) {
   const [sendingRequest, setSendingRequest]     = useState(false)
   const [requestError, setRequestError]         = useState('')
   const [pendingRequestId, setPendingRequestId] = useState(null)
+  const [tagPickerKey, setTagPickerKey]         = useState(null)
+  const [taste, setTaste]                       = useState(null)
 
   // Request reply picker
   const [showReplyPicker, setShowReplyPicker]     = useState(false)
@@ -419,7 +426,7 @@ export default function ConversationView({ friend, onBack }) {
   }
 
   // ── Song request composer ───────────────────────────────────
-  function openRequestComposer() {
+  async function openRequestComposer() {
     setShowRequest(true)
     setShowLibrary(false)
     setShowReplyPicker(false)
@@ -427,21 +434,18 @@ export default function ConversationView({ friend, onBack }) {
     setSelectedTemplate(null)
     setRequestVars({})
     setRequestError('')
+    setTagPickerKey(null)
+    if (!taste) {
+      try { const { data } = await getTaste(); setTaste(data) } catch (_) {}
+    }
   }
 
   function selectTemplate(tmpl) {
     const vars = {}
-    Object.entries(tmpl.placeholders).forEach(([key, ph]) => { vars[key] = ph.options[0] })
+    Object.entries(tmpl.placeholders).forEach(([key]) => { vars[key] = ['any'] })
     setSelectedTemplate(tmpl.id)
     setRequestVars(vars)
     setRequestStep('customize')
-  }
-
-  function cycleVar(key, options) {
-    setRequestVars(prev => {
-      const idx = options.indexOf(prev[key])
-      return { ...prev, [key]: options[(idx + 1) % options.length] }
-    })
   }
 
   async function handleSendRequest() {
@@ -725,15 +729,21 @@ export default function ConversationView({ friend, onBack }) {
                 </button>
               </div>
               <div className="overflow-y-auto flex-1 px-3 pb-3 space-y-2">
-                {REQUEST_TEMPLATES.map(tmpl => (
-                  <button key={tmpl.id} onClick={() => selectTemplate(tmpl)}
-                    className="w-full text-left bg-[#282828] hover:bg-[#333] rounded-xl p-3 transition-colors">
-                    <p className="text-[#1DB954] text-[9px] font-bold uppercase tracking-wider mb-1">{tmpl.label}</p>
-                    <p className="text-white text-xs leading-relaxed">
-                      {tmpl.template.replace(/\{(\w+)\}/g, (_, k) => `[${tmpl.placeholders[k]?.label ?? k}]`)}
-                    </p>
-                  </button>
-                ))}
+                {REQUEST_TEMPLATES.map(tmpl => {
+                  const slotCount = Object.keys(tmpl.placeholders).length
+                  return (
+                    <button key={tmpl.id} onClick={() => selectTemplate(tmpl)}
+                      className="w-full text-left bg-[#282828] hover:bg-[#333] rounded-xl p-3 transition-colors">
+                      <div className="flex items-center justify-between mb-1">
+                        <p className="text-[#1DB954] text-[9px] font-bold uppercase tracking-wider">{tmpl.label}</p>
+                        <span className="text-[#535353] text-[9px]">{slotCount} tag{slotCount !== 1 ? 's' : ''}</span>
+                      </div>
+                      <p className="text-white text-xs leading-relaxed">
+                        {tmpl.template.replace(/\{(\w+)\}/g, (_, k) => `[${tmpl.placeholders[k]?.label ?? k}]`)}
+                      </p>
+                    </button>
+                  )
+                })}
               </div>
             </>
           ) : (
@@ -742,14 +752,14 @@ export default function ConversationView({ friend, onBack }) {
                 <button onClick={() => setRequestStep('templates')} className="text-[#B3B3B3] hover:text-white transition-colors">
                   <ChevronLeft size={18} />
                 </button>
-                <span className="text-white text-xs font-semibold flex-1">Customize your request</span>
+                <span className="text-white text-xs font-semibold flex-1">Tap a tag to customise</span>
                 <button onClick={() => setShowRequest(false)} className="text-[#535353] hover:text-white transition-colors">
                   <X size={16} />
                 </button>
               </div>
               <div className="px-4 py-2 flex-1 overflow-y-auto">
                 <div className="text-white text-sm leading-loose flex flex-wrap items-center gap-x-1 gap-y-2">
-                  {renderTemplateWithPills(selectedTemplate, requestVars, cycleVar)}
+                  {renderTemplateWithPills(selectedTemplate, requestVars, setTagPickerKey)}
                 </div>
                 {requestError && <p className="text-red-400 text-[10px] mt-2">{requestError}</p>}
               </div>
@@ -763,6 +773,22 @@ export default function ConversationView({ friend, onBack }) {
           )}
         </div>
       )}
+
+      {/* ── Tag picker overlay ── */}
+      {tagPickerKey && selectedTemplate && (() => {
+        const ph = REQUEST_TEMPLATES.find(t => t.id === selectedTemplate)?.placeholders[tagPickerKey]
+        if (!ph) return null
+        return (
+          <TagPicker
+            category={ph.category}
+            label={ph.label}
+            currentVals={requestVars[tagPickerKey] ?? ['any']}
+            taste={taste}
+            onDone={vals => { setRequestVars(prev => ({ ...prev, [tagPickerKey]: vals })); setTagPickerKey(null) }}
+            onClose={() => setTagPickerKey(null)}
+          />
+        )
+      })()}
 
       {/* ── Library picker panel — two-level ── */}
       {showLibrary && (
