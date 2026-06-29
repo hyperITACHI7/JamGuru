@@ -51,7 +51,7 @@ function renderTemplateWithPills(templateId, vars, openPicker) {
   })
 }
 
-function Bubble({ msg, onLike, justLiked, requestText }) {
+function Bubble({ msg, onLike, justLiked, requestText, friendName }) {
   const player  = usePlayer()
   const active  = player.isActive(msg.song)
   const playing = active && player.playing
@@ -87,7 +87,7 @@ function Bubble({ msg, onLike, justLiked, requestText }) {
         isSent
           ? isReply ? 'bg-[#1DB954]/20 rounded-tr-sm' : 'bg-[#1DB954]/15 rounded-tr-sm'
           : isReply ? 'bg-[#2e2e2e] rounded-tl-sm' : 'bg-[#282828] rounded-tl-sm'
-      } ${dislikeActive || isPreDiscovered ? 'opacity-50' : ''}`}>
+      } ${dislikeActive ? 'opacity-60' : ''}`}>
 
         {/* Reply quote block — WhatsApp / Instagram style */}
         {isReply && requestText && (
@@ -152,7 +152,9 @@ function Bubble({ msg, onLike, justLiked, requestText }) {
         {isSent && (
           <div className="mt-2 flex items-center gap-2 flex-wrap">
             <span className={`flex items-center gap-1 text-[10px] font-medium ${msg.liked ? 'text-[#1DB954]' : 'text-[#535353]'}`}>
-              {msg.liked ? <><Heart size={9} fill="currentColor" /> Loved it</>
+              {msg.preDiscovered
+                ? <><Music size={9} /> Already in {friendName}'s library</>
+                : msg.liked ? <><Heart size={9} fill="currentColor" /> Loved it</>
                 : msg.dismissed ? <><ThumbsDown size={9} /> Not for me</>
                 : <><Heart size={9} fill="none" /> Not liked yet</>}
             </span>
@@ -601,7 +603,8 @@ export default function ConversationView({ friend, onBack }) {
                     onPickSong={() => handlePickSongForRequest(msg.id, msg.renderedText)} />
                 : <Bubble key={msg.id} msg={msg} onLike={handleLike}
                     justLiked={justLikedIds.has(msg.id)}
-                    requestText={msg.requestId ? requestTextMap[msg.requestId] : null} />
+                    requestText={msg.requestId ? requestTextMap[msg.requestId] : null}
+                    friendName={friend.displayName} />
             )}
             <div ref={bottomRef} />
           </>
