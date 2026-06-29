@@ -259,6 +259,52 @@ router.get('/conversation/:friendId', auth, async (req, res) => {
   }
 });
 
+// GET /api/recommendations/friend-status/:friendId?ids=a,b,c
+// Batch check: for each spotifyId, has this friend already liked/playlisted it (preDiscovered)
+// or disliked/dismissed a past recommendation of it (priorFeedback)? Used by the sender's song
+// pickers (library/AI) to show a non-blocking "already explored" hint before sending.
+router.get('/friend-status/:friendId', auth, async (req, res) => {
+  try {
+    const { friendId } = req.params;
+    const ids = (req.query.ids || '').split(',').filter(Boolean);
+    if (ids.length === 0) return res.json({});
+
+    const friendship = await prisma.friendship.findFirst({
+      where: {
+        status: 'ACCEPTED',
+        OR: [
+          { requesterId: req.userId, addresseeId: friendId },
+          { requesterId: friendId, addresseeId: req.userId },
+        ],
+      },
+    });
+    if (!friendship) return res.status(403).json({ error: 'You can only check friends' });
+
+    const [likes, playlistSongs, dislikes, dismissed] = await Promise.all([
+      prisma.songLike.findMany({ where: { userId: friendId, spotifyId: { in: ids } }, select: { spotifyId: true } }),
+      prisma.playlistSong.findMany({ where: { spotifyId: { in: ids }, playlist: { userId: friendId } }, select: { spotifyId: true } }),
+      prisma.songDislike.findMany({ where: { userId: friendId, spotifyId: { in: ids } }, select: { spotifyId: true } }),
+      prisma.recommendation.findMany({ where: { recipientId: friendId, songId: { in: ids }, dismissedAt: { not: null } }, select: { songId: true } }),
+    ]);
+
+    const likedSet     = new Set(likes.map(l => l.spotifyId));
+    const playlistSet  = new Set(playlistSongs.map(p => p.spotifyId));
+    const dislikedSet  = new Set(dislikes.map(d => d.spotifyId));
+    const dismissedSet = new Set(dismissed.map(d => d.songId));
+
+    const result = {};
+    for (const id of ids) {
+      const preDiscovered = likedSet.has(id) || playlistSet.has(id);
+      const priorFeedback = dislikedSet.has(id) ? 'disliked' : dismissedSet.has(id) ? 'dismissed' : null;
+      if (preDiscovered || priorFeedback) result[id] = { preDiscovered, priorFeedback };
+    }
+    res.json(result);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // PATCH /api/recommendations/:id/reconsider — recipient clears prior-feedback to re-evaluate
 router.patch('/:id/reconsider', auth, async (req, res) => {
   try {

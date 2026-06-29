@@ -4,7 +4,7 @@ import {
   ChevronRight, ThumbsDown, Plus, Search, ChevronLeft, ListMusic, Reply, RefreshCw,
 } from 'lucide-react'
 import FriendProfileSheet from '../components/FriendProfileSheet'
-import { getConversation, sendRecommendation, reconsiderRecommendation } from '../phase3/api/recommendations'
+import { getConversation, sendRecommendation, reconsiderRecommendation, getFriendSongStatus } from '../phase3/api/recommendations'
 import {
   likeRecommendation, unlikeRecommendation,
   dismissRecommendation, undismissRecommendation,
@@ -20,6 +20,14 @@ import { rankForRequest, suggestForRequest } from '../phase7/api/ai'
 import FeedbackTags from '../phase4/components/FeedbackTags'
 import { usePlayer } from '../context/PlayerContext'
 import { getAiSuggestion } from '../phase7/api/ai'
+
+function ExploredBadge({ status }) {
+  if (!status) return null
+  if (status.priorFeedback === 'disliked')  return <span className="text-[9px] text-red-400/80 flex-shrink-0 whitespace-nowrap ml-1">Not their vibe</span>
+  if (status.priorFeedback === 'dismissed') return <span className="text-[9px] text-[#535353] flex-shrink-0 whitespace-nowrap ml-1">Already passed</span>
+  if (status.preDiscovered)                 return <span className="text-[9px] text-[#1DB954]/70 flex-shrink-0 whitespace-nowrap ml-1">Already has it</span>
+  return null
+}
 
 function formatTime(iso) {
   const d    = new Date(iso)
@@ -308,6 +316,9 @@ export default function ConversationView({ friend, onBack }) {
   const [librarySearchResults, setLibrarySearchResults] = useState([])
   const [librarySearchLoading, setLibrarySearchLoading] = useState(false)
 
+  // Already-explored-by-friend hints, keyed by spotifyId — { preDiscovered, priorFeedback }
+  const [exploredStatus, setExploredStatus] = useState({})
+
   const bottomRef  = useRef(null)
   const searchRef  = useRef(null)
   const replySearchRef = useRef(null)
@@ -339,6 +350,16 @@ export default function ConversationView({ friend, onBack }) {
     if (!loading) bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [loading, messages.length])
 
+  // ── Already-explored-by-friend hints ────────────────────────
+  async function fetchExploredStatus(songs) {
+    const ids = [...new Set(songs.map(s => s.spotifyId).filter(Boolean))]
+    if (ids.length === 0) return
+    try {
+      const { data } = await getFriendSongStatus(friend.id, ids)
+      setExploredStatus(prev => ({ ...prev, ...data }))
+    } catch (_) {}
+  }
+
   // ── Library picker ──────────────────────────────────────────
   function handleLibrarySearchChange(q) {
     setLibrarySearch(q)
@@ -350,6 +371,7 @@ export default function ConversationView({ friend, onBack }) {
       try {
         const { data } = await searchSongs(q)
         setLibrarySearchResults(data.tracks || [])
+        fetchExploredStatus(data.tracks || [])
       } catch (_) {}
       setLibrarySearchLoading(false)
     }, 400)
@@ -383,9 +405,12 @@ export default function ConversationView({ friend, onBack }) {
       if (playlist.type === 'liked') {
         const { data } = await getLikedSongs()
         setLibrarySongs(data.songs || [])
+        fetchExploredStatus(data.songs || [])
       } else {
         const { data } = await getPlaylist(playlist.id)
-        setLibrarySongs((data.playlist?.songs || []).map(ps => ps.song))
+        const songs = (data.playlist?.songs || []).map(ps => ps.song)
+        setLibrarySongs(songs)
+        fetchExploredStatus(songs)
       }
     } catch (_) {}
     setLibraryLoading(false)
@@ -438,13 +463,17 @@ export default function ConversationView({ friend, onBack }) {
     }
     // Fire both AI calls in parallel, resolve independently
     rankForRequest(requestId)
-      .then(({ data }) => { setReplyPickerPicks(data.picks || []); setReplyPickerRemaining(data.remaining || []) })
+      .then(({ data }) => {
+        setReplyPickerPicks(data.picks || [])
+        setReplyPickerRemaining(data.remaining || [])
+        fetchExploredStatus(data.picks || [])
+      })
       .catch(async () => {
         try { const { data } = await getLikedSongs(); setReplyPickerRemaining(data.songs || []) } catch {}
       })
       .finally(() => setReplyPickerLoading(false))
     suggestForRequest(requestId)
-      .then(({ data }) => setReplyPickerExternal(data.songs || []))
+      .then(({ data }) => { setReplyPickerExternal(data.songs || []); fetchExploredStatus(data.songs || []) })
       .catch(() => {})
       .finally(() => setReplyPickerExternalLoading(false))
   }
@@ -458,6 +487,7 @@ export default function ConversationView({ friend, onBack }) {
       try {
         const { data } = await searchSongs(q)
         setReplySearchResults(data.tracks || [])
+        fetchExploredStatus(data.tracks || [])
       } catch (_) {}
       setReplySearchLoading(false)
     }, 400)
@@ -702,6 +732,7 @@ export default function ConversationView({ friend, onBack }) {
                     <p className="text-white text-xs font-medium truncate">{song.title}</p>
                     <p className="text-[#B3B3B3] text-[10px] truncate mt-0.5">{song.artist}</p>
                   </div>
+                  <ExploredBadge status={exploredStatus[song.spotifyId]} />
                 </button>
               ))
             ) : replySearch.trim() ? (
@@ -723,6 +754,7 @@ export default function ConversationView({ friend, onBack }) {
                     <p className="text-white text-xs font-medium truncate">{song.title}</p>
                     <p className="text-[#B3B3B3] text-[10px] truncate mt-0.5">{song.artist}</p>
                   </div>
+                  <ExploredBadge status={exploredStatus[song.spotifyId]} />
                 </button>
               ))
             ) : (
@@ -755,6 +787,7 @@ export default function ConversationView({ friend, onBack }) {
                         <p className="text-[#B3B3B3] text-[10px] truncate mt-0.5">{song.artist}</p>
                       </div>
                       {song.aiReason && <span className="text-[#535353] text-[9px] italic flex-shrink-0 max-w-[90px] text-right leading-tight">{song.aiReason}</span>}
+                      <ExploredBadge status={exploredStatus[song.spotifyId]} />
                     </button>
                   ))
                 })()}
@@ -927,6 +960,7 @@ export default function ConversationView({ friend, onBack }) {
                       <p className="text-white text-xs font-medium truncate">{song.title}</p>
                       <p className="text-[#B3B3B3] text-[10px] truncate mt-0.5">{song.artist}</p>
                     </div>
+                    <ExploredBadge status={exploredStatus[song.spotifyId]} />
                   </button>
                 ))
               )}
@@ -996,6 +1030,7 @@ export default function ConversationView({ friend, onBack }) {
                       <p className="text-white text-xs font-medium truncate">{song.title}</p>
                       <p className="text-[#B3B3B3] text-[10px] truncate mt-0.5">{song.artist}</p>
                     </div>
+                    <ExploredBadge status={exploredStatus[song.spotifyId]} />
                   </button>
                 ))
               )}
@@ -1029,6 +1064,7 @@ export default function ConversationView({ friend, onBack }) {
                   <Reply size={8} /> reply
                 </span>
               )}
+              <ExploredBadge status={exploredStatus[suggested.song.spotifyId]} />
               <button
                 onClick={handleAiSuggest}
                 disabled={suggesting}
