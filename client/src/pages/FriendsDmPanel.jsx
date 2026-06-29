@@ -3,12 +3,15 @@ import { MessageCircle, Users, UserPlus, Plus } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { getFriends, getInboxSummary } from '../phase3/api/friends'
 import { getGroups } from '../phase5/api/groups'
+import { getTrustRankings } from '../phase4/api/jamguru'
 
 export default function FriendsDmPanel({ selected, onSelect, className = '' }) {
   const [tab, setTab]         = useState('friends')
   const [friends, setFriends] = useState([])
   const [groups, setGroups]   = useState([])
   const [loading, setLoading] = useState(true)
+  const [sort, setSort]       = useState('latest')
+  const [trustMap, setTrustMap] = useState({})
   // summary: { friends: { [friendId]: { newSongsCount, openRequestCount } }, groups: { [groupId]: {...} } }
   const [summary, setSummary] = useState({ friends: {}, groups: {} })
 
@@ -34,6 +37,13 @@ export default function FriendsDmPanel({ selected, onSelect, className = '' }) {
       .catch(() => {})
       .finally(() => setLoading(false))
     fetchSummary()
+    getTrustRankings()
+      .then(({ data }) => {
+        const map = {}
+        for (const r of data) map[r.friend.id] = r.trustScore
+        setTrustMap(map)
+      })
+      .catch(() => {})
   }, [fetchSummary])
 
   // Re-fetch summary on any like/dismiss action or SSE event
@@ -79,6 +89,14 @@ export default function FriendsDmPanel({ selected, onSelect, className = '' }) {
     if (reqs  > 0) parts.push(`${reqs} request${reqs > 1 ? 's' : ''}`)
     return { text: parts.join(' · '), green: reqs > 0 }
   }
+
+  const sortedFriends = sort === 'score'
+    ? [...friends].sort((a, b) => (trustMap[b.id] ?? 0) - (trustMap[a.id] ?? 0))
+    : [...friends].sort((a, b) => {
+        const aAct = (summary.friends[a.id]?.newSongsCount ?? 0) + (summary.friends[a.id]?.openRequestCount ?? 0)
+        const bAct = (summary.friends[b.id]?.newSongsCount ?? 0) + (summary.friends[b.id]?.openRequestCount ?? 0)
+        return bAct - aAct
+      })
 
   return (
     <div className={`w-[240px] flex-shrink-0 border-l border-white/5 flex flex-col overflow-hidden ${className}`}>
@@ -128,6 +146,22 @@ export default function FriendsDmPanel({ selected, onSelect, className = '' }) {
         )}
       </div>
 
+      {/* Sort toggle — friends tab only */}
+      {tab === 'friends' && friends.length > 0 && (
+        <div className="px-3 py-2 flex-shrink-0 border-b border-white/5">
+          <div className="flex bg-[#1a1a1a] rounded-full p-0.5">
+            {[['latest', 'Latest'], ['score', 'By Score']].map(([val, label]) => (
+              <button key={val} onClick={() => setSort(val)}
+                className={`flex-1 py-1 rounded-full text-[10px] font-bold transition-colors ${
+                  sort === val ? 'bg-white text-black' : 'text-[#B3B3B3] hover:text-white'
+                }`}>
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* List */}
       <div className="flex-1 overflow-y-auto">
         {loading ? (
@@ -145,7 +179,7 @@ export default function FriendsDmPanel({ selected, onSelect, className = '' }) {
             </div>
           ) : (
             <div className="py-1">
-              {friends.map(f => {
+              {sortedFriends.map(f => {
                 const active = isFriendSelected(f)
                 const sub    = friendSubtitle(f)
                 return (

@@ -51,7 +51,6 @@ export default function JamGuru() {
   const [showMobileMessages, setShowMobileMessages] = useState(false)
   const [refreshing, setRefreshing]           = useState(false)
   const [error, setError]                     = useState(null)
-  const [sort, setSort]                       = useState('score')
   const [jamGuruForCount, setJamGuruForCount] = useState(0)
   // selectedEntity: null | { type: 'friend'|'group', data: {...} }
   const [selectedEntity, setSelectedEntity]   = useState(null)
@@ -62,11 +61,11 @@ export default function JamGuru() {
       .catch(() => {})
   }, [])
 
-  const fetchInbox = useCallback((currentSort, isRefresh = false) => {
+  const fetchInbox = useCallback((isRefresh = false) => {
     if (isRefresh) { setRefreshing(true); fetchJamGuruCount() }
     else setLoading(true)
     setError(null)
-    getInbox(currentSort)
+    getInbox('score')
       .then(({ data }) => setInbox(data))
       .catch(() => setError('Could not load inbox'))
       .finally(() => { setLoading(false); setRefreshing(false) })
@@ -74,8 +73,8 @@ export default function JamGuru() {
 
   useEffect(() => {
     fetchJamGuruCount()
-    fetchInbox(sort)
-  }, [sort, fetchInbox, fetchJamGuruCount])
+    fetchInbox()
+  }, [fetchInbox, fetchJamGuruCount])
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -190,7 +189,7 @@ export default function JamGuru() {
                       Find Friends
                     </Link>
                     <button
-                      onClick={() => fetchInbox(sort, true)}
+                      onClick={() => fetchInbox(true)}
                       disabled={refreshing}
                       className="inline-flex items-center gap-2 bg-[#282828] text-white font-bold px-5 py-3 rounded-full hover:bg-[#3e3e3e] transition-colors disabled:opacity-40"
                     >
@@ -211,50 +210,27 @@ export default function JamGuru() {
                         {inbox.length} new
                       </span>
                     </h2>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => fetchInbox(sort, true)}
-                        disabled={refreshing}
-                        title="Refresh inbox"
-                        className="text-[#B3B3B3] hover:text-white transition-colors disabled:opacity-40 p-1"
-                      >
-                        <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
-                      </button>
-                      <div className="flex gap-1 bg-[#1a1a1a] rounded-full p-1">
-                        {[['latest', 'Latest'], ['score', 'By Score']].map(([val, label]) => (
-                          <button
-                            key={val}
-                            onClick={() => setSort(val)}
-                            className={`px-4 py-1 rounded-full text-xs font-bold transition-colors ${
-                              sort === val ? 'bg-white text-black' : 'text-[#B3B3B3] hover:text-white'
-                            }`}
-                          >
-                            {label}
-                          </button>
+                    <button
+                      onClick={() => fetchInbox(true)}
+                      disabled={refreshing}
+                      title="Refresh inbox"
+                      className="text-[#B3B3B3] hover:text-white transition-colors disabled:opacity-40 p-1"
+                    >
+                      <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
+                    </button>
+                  </div>
+                  {groupByTime(inbox).map(group => (
+                    <div key={group.label} className="mb-6">
+                      <p className="text-[#B3B3B3] text-[11px] font-bold uppercase tracking-widest mb-3">
+                        {group.label}
+                      </p>
+                      <div className="space-y-3">
+                        {group.recs.map(rec => (
+                          <RecommendationCard key={rec.id} rec={rec} />
                         ))}
                       </div>
                     </div>
-                  </div>
-                  {sort === 'latest' ? (
-                    groupByTime(inbox).map(group => (
-                      <div key={group.label} className="mb-6">
-                        <p className="text-[#B3B3B3] text-[11px] font-bold uppercase tracking-widest mb-3">
-                          {group.label}
-                        </p>
-                        <div className="space-y-3">
-                          {group.recs.map(rec => (
-                            <RecommendationCard key={rec.id} rec={rec} />
-                          ))}
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="space-y-3">
-                      {inbox.map(rec => (
-                        <RecommendationCard key={rec.id} rec={rec} />
-                      ))}
-                    </div>
-                  )}
+                  ))}
                 </div>
               )}
             </div>
