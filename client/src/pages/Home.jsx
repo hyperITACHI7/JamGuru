@@ -168,6 +168,8 @@ function ForYouCard({ song, onShare }) {
 
 export default function Home() {
   const user  = JSON.parse(localStorage.getItem('user') || '{}')
+  const CACHE_KEY = `forYou_${user.id || 'anon'}`
+
   const [songs, setSongs]       = useState([])
   const [loading, setLoading]   = useState(true)
 
@@ -178,23 +180,68 @@ export default function Home() {
   const [hasTaste, setHasTaste]           = useState(null) // null = unknown
   const [shareSong, setShareSong]         = useState(null)
 
-  // Check if user has a taste profile, then load initial For You suggestions
+  // On mount: check taste profile; use cache if taste hasn't changed since last generation
   useEffect(() => {
     getTaste()
       .then(({ data }) => {
-        const has = (data.genres?.length || data.artists?.length || data.moods?.length)
-        setHasTaste(!!has)
-        if (has) loadForYou()
+        const has = !!(data.genres?.length || data.artists?.length || data.moods?.length)
+        setHasTaste(has)
+        if (!has) return
+
+        const tasteVersion = data.updatedAt ? new Date(data.updatedAt).toISOString() : null
+
+        if (tasteVersion) {
+          try {
+            const cached = JSON.parse(localStorage.getItem(CACHE_KEY))
+            if (cached?.version === tasteVersion && cached?.songs?.length > 0) {
+              setForYou(cached.songs)
+              return // cache hit — no AI call needed
+            }
+          } catch {}
+        }
+
+        // Cache miss or taste has changed since last generation
+        fetchAndCacheForYou(tasteVersion)
       })
       .catch(() => setHasTaste(false))
   }, [])
 
-  async function loadForYou() {
+  async function fetchAndCacheForYou(tasteVersion) {
     setForYouLoading(true)
     setForYouError('')
     try {
       const { data } = await suggestForMe()
-      setForYou(data.songs || [])
+      const songs = data.songs || []
+      setForYou(songs)
+      if (tasteVersion && songs.length > 0) {
+        try {
+          localStorage.setItem(CACHE_KEY, JSON.stringify({ songs, version: tasteVersion }))
+        } catch {}
+      }
+    } catch (e) {
+      setForYouError(e.response?.data?.error || 'Could not load suggestions.')
+    } finally {
+      setForYouLoading(false)
+    }
+  }
+
+  // Refresh button: always fetch fresh suggestions and update the cache
+  async function handleRefresh() {
+    setForYouLoading(true)
+    setForYouError('')
+    try {
+      const [{ data: aiData }, { data: tasteData }] = await Promise.all([
+        suggestForMe(),
+        getTaste(),
+      ])
+      const songs = aiData.songs || []
+      setForYou(songs)
+      const tasteVersion = tasteData.updatedAt ? new Date(tasteData.updatedAt).toISOString() : null
+      if (songs.length > 0) {
+        try {
+          localStorage.setItem(CACHE_KEY, JSON.stringify({ songs, version: tasteVersion }))
+        } catch {}
+      }
     } catch (e) {
       setForYouError(e.response?.data?.error || 'Could not load suggestions.')
     } finally {
@@ -293,7 +340,7 @@ export default function Home() {
                     Picked For You
                   </h2>
                   <button
-                    onClick={loadForYou}
+                    onClick={handleRefresh}
                     disabled={forYouLoading}
                     className="flex items-center gap-1.5 text-[#B3B3B3] hover:text-white text-xs font-bold uppercase tracking-wider transition-colors disabled:opacity-40"
                   >
