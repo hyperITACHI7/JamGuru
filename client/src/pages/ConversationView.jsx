@@ -4,7 +4,7 @@ import {
   ChevronRight, ThumbsDown, Plus, Search, ChevronLeft, ListMusic, Reply, RefreshCw,
 } from 'lucide-react'
 import FriendProfileSheet from '../components/FriendProfileSheet'
-import { getConversation, sendRecommendation } from '../phase3/api/recommendations'
+import { getConversation, sendRecommendation, reconsiderRecommendation } from '../phase3/api/recommendations'
 import {
   likeRecommendation, unlikeRecommendation,
   dismissRecommendation, undismissRecommendation,
@@ -59,11 +59,14 @@ function Bubble({ msg, onLike, justLiked, requestText, friendName }) {
   const isReply = !!msg.requestId
   const [reaction, setReaction] = useState(msg.dismissed ? 'dismiss' : null)
 
+  const [reconsidered, setReconsidered] = useState(false)
+
   const tagPickerOpen   = justLiked && !!msg.likeId
   const dismissActive   = reaction === 'dismiss'
   const dislikeActive   = reaction === 'dislike'
   const anyReaction     = dismissActive || dislikeActive
   const isPreDiscovered = !isSent && !!msg.preDiscovered
+  const isPriorFeedback = !isSent && !!msg.priorFeedback && !reconsidered
 
   async function handleDismiss() {
     try {
@@ -81,13 +84,21 @@ function Bubble({ msg, onLike, justLiked, requestText, friendName }) {
     } catch (_) {}
   }
 
+  async function handleReconsider() {
+    try {
+      await reconsiderRecommendation(msg.id)
+      setReconsidered(true)
+      window.dispatchEvent(new CustomEvent('jam:like'))
+    } catch (_) {}
+  }
+
   return (
     <div className={`flex ${isSent ? 'justify-end' : 'justify-start'} mb-4 px-4`}>
       <div className={`max-w-[72%] rounded-2xl p-3 ${
         isSent
           ? isReply ? 'bg-[#1DB954]/20 rounded-tr-sm' : 'bg-[#1DB954]/15 rounded-tr-sm'
           : isReply ? 'bg-[#2e2e2e] rounded-tl-sm' : 'bg-[#282828] rounded-tl-sm'
-      } ${dislikeActive ? 'opacity-60' : ''}`}>
+      } ${dislikeActive || isPriorFeedback ? 'opacity-50' : ''}`}>
 
         {/* Reply quote block — WhatsApp / Instagram style */}
         {isReply && requestText && (
@@ -124,7 +135,7 @@ function Bubble({ msg, onLike, justLiked, requestText, friendName }) {
                   {playing ? <Pause size={10} fill="currentColor" /> : <Play size={10} fill="currentColor" />}
                 </button>
               )}
-              {!isPreDiscovered && (
+              {!isPreDiscovered && !isPriorFeedback && (
                 <button onClick={() => onLike(msg)} disabled={anyReaction}
                   className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${
                     msg.liked ? 'text-[#1DB954] hover:text-red-400'
@@ -154,6 +165,10 @@ function Bubble({ msg, onLike, justLiked, requestText, friendName }) {
             <span className={`flex items-center gap-1 text-[10px] font-medium ${msg.liked ? 'text-[#1DB954]' : 'text-[#535353]'}`}>
               {msg.preDiscovered
                 ? <><Music size={9} /> Already in {friendName}'s library</>
+                : msg.priorFeedback === 'disliked'
+                ? <><ThumbsDown size={9} fill="currentColor" /> Not my vibe</>
+                : msg.priorFeedback === 'dismissed'
+                ? <><X size={9} /> Not for them</>
                 : msg.liked ? <><Heart size={9} fill="currentColor" /> Loved it</>
                 : msg.dismissed ? <><ThumbsDown size={9} /> Not for me</>
                 : <><Heart size={9} fill="none" /> Not liked yet</>}
@@ -164,11 +179,23 @@ function Bubble({ msg, onLike, justLiked, requestText, friendName }) {
           </div>
         )}
 
-        {!isSent && isPreDiscovered && (
+        {!isSent && isPriorFeedback && (
+          <div className="mt-2 pt-1.5 border-t border-white/5 flex items-center justify-between">
+            <p className="text-[#535353] text-[9px]">
+              {msg.priorFeedback === 'disliked' ? 'Not my vibe' : 'Not for me'}
+            </p>
+            <button onClick={handleReconsider}
+              className="text-[10px] font-medium text-[#1DB954] hover:text-[#1DB954]/80 transition-colors">
+              Reconsider
+            </button>
+          </div>
+        )}
+
+        {!isSent && !isPriorFeedback && isPreDiscovered && (
           <p className="text-[#535353] text-[9px] mt-1.5">Already in your library</p>
         )}
 
-        {!isSent && !isPreDiscovered && (
+        {!isSent && !isPriorFeedback && !isPreDiscovered && (
           <>
             {msg.liked && !justLiked && msg.tags.length > 0 && (
               <div className="flex flex-wrap gap-1 mt-2 mb-1">

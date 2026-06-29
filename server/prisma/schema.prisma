@@ -125,6 +125,7 @@ model Recommendation {
   dismissedAt   DateTime? @map("dismissed_at")
   dismissedById String?   @map("dismissed_by_id")
   preDiscovered Boolean   @default(false) @map("pre_discovered")
+  priorFeedback String?              @map("prior_feedback")
 
   sender    User   @relation("RecSender",    fields: [senderId],    references: [id], onDelete: Cascade)
   recipient User?  @relation("RecRecipient", fields: [recipientId], references: [id], onDelete: SetNull)

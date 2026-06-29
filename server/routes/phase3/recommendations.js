@@ -43,12 +43,15 @@ router.post('/', auth, async (req, res) => {
     const song = await prisma.song.findUnique({ where: { spotifyId: songId } });
     if (!song) return res.status(404).json({ error: 'Song not found — search for it first' });
 
-    // Check if the recipient has already discovered this song before it arrives
-    const [alreadyLiked, alreadyInPlaylist] = await Promise.all([
+    // Check if the recipient has already discovered or reacted to this song
+    const [alreadyLiked, alreadyInPlaylist, alreadyDisliked, alreadyDismissed] = await Promise.all([
       prisma.songLike.findUnique({ where: { userId_spotifyId: { userId: recipientId, spotifyId: songId } } }),
       prisma.playlistSong.findFirst({ where: { spotifyId: songId, playlist: { userId: recipientId } } }),
+      prisma.songDislike.findUnique({ where: { userId_spotifyId: { userId: recipientId, spotifyId: songId } } }),
+      prisma.recommendation.findFirst({ where: { recipientId, songId, dismissedAt: { not: null } }, select: { id: true } }),
     ]);
     const preDiscovered = !!(alreadyLiked || alreadyInPlaylist);
+    const priorFeedback = alreadyDisliked ? 'disliked' : alreadyDismissed ? 'dismissed' : null;
 
     const rec = await prisma.recommendation.create({
       data: {
@@ -58,6 +61,7 @@ router.post('/', auth, async (req, res) => {
         context:      context?.trim() || null,
         requestId:    requestId ?? null,
         preDiscovered,
+        priorFeedback,
       },
       include: {
         song: true,
@@ -106,6 +110,7 @@ router.get('/inbox', auth, async (req, res) => {
       where: {
         recipientId:   req.userId,
         preDiscovered: false,
+        priorFeedback: null,
         OR: [
           { dismissedAt: null },
           // Disliked ("not my vibe") — show but disabled
@@ -165,6 +170,7 @@ router.get('/pending-count', auth, async (req, res) => {
       where: {
         recipientId:   req.userId,
         preDiscovered: false,
+        priorFeedback: null,
         dismissedAt:   null,
         likes: { none: { likerId: req.userId } },
       },
@@ -228,6 +234,7 @@ router.get('/conversation/:friendId', auth, async (req, res) => {
         tags:          r.likes[0]?.feedbacks?.map(f => f.tag) ?? [],
         dismissed:     !!r.dismissedAt,
         preDiscovered: !!r.preDiscovered,
+        priorFeedback: r.priorFeedback ?? null,
       }));
 
     const messages = [
@@ -246,6 +253,26 @@ router.get('/conversation/:friendId', auth, async (req, res) => {
     ].sort((a, b) => new Date(a.sentAt) - new Date(b.sentAt));
 
     res.json(messages);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// PATCH /api/recommendations/:id/reconsider — recipient clears prior-feedback to re-evaluate
+router.patch('/:id/reconsider', auth, async (req, res) => {
+  try {
+    const rec = await prisma.recommendation.findUnique({
+      where:  { id: req.params.id },
+      select: { recipientId: true },
+    });
+    if (!rec) return res.status(404).json({ error: 'Not found' });
+    if (rec.recipientId !== req.userId) return res.status(403).json({ error: 'Forbidden' });
+    await prisma.recommendation.update({
+      where: { id: req.params.id },
+      data:  { priorFeedback: null },
+    });
+    res.json({ ok: true });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'Server error' });
