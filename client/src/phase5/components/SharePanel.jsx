@@ -1,122 +1,28 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { X, Check, Music, UserPlus, Users, Sparkles, RefreshCw, ArrowRight } from 'lucide-react'
+import { X, Check, Music, UserPlus, Users, Sparkles } from 'lucide-react'
 import { getFriends } from '../../phase3/api/friends'
 import { sendRecommendation } from '../../phase3/api/recommendations'
 import { getGroups, sendGroupRec } from '../api/groups'
-import { getAiSuggestion } from '../../phase7/api/ai'
 import api from '../../api/axios'
 
 function getSongFriendMatches(spotifyId) {
   return api.get(`/songs/${spotifyId}/friend-matches`)
 }
 
-// ── AI Suggestion Widget ──────────────────────────────────────────────────────
-
-function AiSuggestWidget({ friend, onAccept }) {
-  const [status, setStatus]   = useState('idle')  // idle | loading | done | error
-  const [suggestion, setSugg] = useState(null)
-  const [errMsg, setErrMsg]   = useState('')
-
-  async function suggest() {
-    setStatus('loading')
-    setErrMsg('')
-    try {
-      const { data } = await getAiSuggestion(friend.id)
-      setSugg(data)
-      setStatus('done')
-    } catch (e) {
-      setErrMsg(e.response?.data?.error || 'AI suggestion failed')
-      setStatus('error')
-    }
-  }
-
-  if (status === 'idle') {
-    return (
-      <button
-        onClick={suggest}
-        className="w-full flex items-center justify-center gap-2 py-2 rounded-xl border border-dashed border-[#1DB954]/40 text-[#1DB954] text-sm font-semibold hover:bg-[#1DB954]/10 transition-colors"
-      >
-        <Sparkles size={15} />
-        Recommend with AI
-      </button>
-    )
-  }
-
-  if (status === 'loading') {
-    return (
-      <div className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-[#1a1a1a] text-[#B3B3B3] text-sm">
-        <div className="w-4 h-4 border-2 border-[#1DB954] border-t-transparent rounded-full animate-spin" />
-        Asking AI for a suggestion…
-      </div>
-    )
-  }
-
-  if (status === 'error') {
-    return (
-      <div className="rounded-xl bg-[#1a1a1a] p-3 text-center">
-        <p className="text-red-400 text-sm mb-2">{errMsg}</p>
-        <button onClick={suggest} className="text-[#1DB954] text-xs hover:underline">Try again</button>
-      </div>
-    )
-  }
-
-  // done
-  const song = suggestion?.song
-  return (
-    <div className="rounded-xl bg-[#1a1a1a] p-3">
-      <p className="text-[#B3B3B3] text-[10px] font-bold uppercase tracking-widest mb-2 flex items-center gap-1">
-        <Sparkles size={10} className="text-[#1DB954]" /> AI suggestion
-      </p>
-      <div className="flex items-center gap-3 mb-3">
-        <div className="w-10 h-10 flex-shrink-0 rounded overflow-hidden bg-[#282828]">
-          {song?.albumArtUrl
-            ? <img src={song.albumArtUrl} alt={song.album} className="w-full h-full object-cover" />
-            : <div className="w-full h-full flex items-center justify-center"><Music size={14} className="text-[#B3B3B3]" /></div>
-          }
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-white text-sm font-semibold truncate">{song?.title}</p>
-          <p className="text-[#B3B3B3] text-xs truncate">{song?.artist}</p>
-        </div>
-      </div>
-      <div className="flex gap-2">
-        <button
-          onClick={() => onAccept(song)}
-          className="flex-1 flex items-center justify-center gap-1.5 bg-[#1DB954] text-black text-sm font-bold py-1.5 rounded-full hover:bg-[#1ed760] transition-colors"
-        >
-          <ArrowRight size={14} /> Use this song
-        </button>
-        <button
-          onClick={suggest}
-          title="Try again"
-          className="flex items-center justify-center gap-1 px-3 py-1.5 rounded-full bg-[#282828] text-[#B3B3B3] hover:text-white transition-colors"
-        >
-          <RefreshCw size={13} />
-        </button>
-      </div>
-    </div>
-  )
-}
-
 // ── Friends Tab ───────────────────────────────────────────────────────────────
 
-function FriendsTab({ activeSong, onSongChange, onClose }) {
-  const [friends, setFriends]       = useState([])
-  const [loading, setLoading]       = useState(true)
-  const [error, setError]           = useState('')
-
-  // Normal mode: single selected friend object
-  // AI mode: Set of selected friend ids
-  const [aiMode, setAiMode]         = useState(false)
-  const [aiLoading, setAiLoading]   = useState(false)
-  const [selected, setSelected]     = useState(null)
-  const [aiSelected, setAiSelected] = useState(new Set())
-
-  const [context, setContext]       = useState('')
-  const [sending, setSending]       = useState(false)
-  const [sent, setSent]             = useState(false)
-  const [sentCount, setSentCount]   = useState(0)
+function FriendsTab({ activeSong, onClose }) {
+  const [friends, setFriends]         = useState([])
+  const [loading, setLoading]         = useState(true)
+  const [error, setError]             = useState('')
+  const [aiLoading, setAiLoading]     = useState(false)
+  const [hasMatchScores, setHasMatch] = useState(false)
+  const [selectedIds, setSelectedIds] = useState(new Set())
+  const [context, setContext]         = useState('')
+  const [sending, setSending]         = useState(false)
+  const [sent, setSent]               = useState(false)
+  const [sentCount, setSentCount]     = useState(0)
 
   useEffect(() => {
     getFriends()
@@ -133,8 +39,8 @@ function FriendsTab({ activeSong, onSongChange, onClose }) {
       const { data } = await getSongFriendMatches(activeSong.spotifyId)
       const ranked = data.friends
       setFriends(ranked)
-      setAiSelected(new Set(ranked.filter(f => f.matchScore >= 50).map(f => f.id)))
-      setAiMode(true)
+      setSelectedIds(new Set(ranked.filter(f => f.matchScore >= 50).map(f => f.id)))
+      setHasMatch(true)
     } catch {
       setError('Could not load predictions. Try again.')
     } finally {
@@ -142,8 +48,8 @@ function FriendsTab({ activeSong, onSongChange, onClose }) {
     }
   }
 
-  function toggleAiSelect(id) {
-    setAiSelected(prev => {
+  function toggleSelect(id) {
+    setSelectedIds(prev => {
       const next = new Set(prev)
       next.has(id) ? next.delete(id) : next.add(id)
       return next
@@ -151,25 +57,16 @@ function FriendsTab({ activeSong, onSongChange, onClose }) {
   }
 
   async function handleSend() {
-    if (!activeSong) return
+    if (!activeSong || selectedIds.size === 0) return
     setSending(true)
     setError('')
     try {
-      if (aiMode) {
-        await Promise.all(
-          [...aiSelected].map(id =>
-            sendRecommendation({ songId: activeSong.spotifyId, recipientId: id, context: context.trim() || undefined })
-          )
+      await Promise.all(
+        [...selectedIds].map(id =>
+          sendRecommendation({ songId: activeSong.spotifyId, recipientId: id, context: context.trim() || undefined })
         )
-        setSentCount(aiSelected.size)
-      } else {
-        if (!selected) return
-        await sendRecommendation({
-          songId: activeSong.spotifyId,
-          recipientId: selected.id,
-          context: context.trim() || undefined,
-        })
-      }
+      )
+      setSentCount(selectedIds.size)
       setSent(true)
       setTimeout(onClose, 2500)
     } catch (e) {
@@ -187,9 +84,7 @@ function FriendsTab({ activeSong, onSongChange, onClose }) {
         </div>
         <p className="text-white font-bold text-lg">Sent!</p>
         <p className="text-[#B3B3B3] text-sm mt-1">
-          {aiMode
-            ? `Shared with ${sentCount} friend${sentCount !== 1 ? 's' : ''}`
-            : `${selected?.displayName} got your recommendation`}
+          Shared with {sentCount} friend{sentCount !== 1 ? 's' : ''}
         </p>
       </div>
     )
@@ -216,145 +111,83 @@ function FriendsTab({ activeSong, onSongChange, onClose }) {
     )
   }
 
-  const highMatches = friends.filter(f => (f.matchScore ?? 0) >= 50)
-  const lowMatches  = friends.filter(f => (f.matchScore ?? 0) < 50)
+  const highMatches = hasMatchScores ? friends.filter(f => (f.matchScore ?? 0) >= 50) : []
+  const otherFriends = hasMatchScores ? friends.filter(f => (f.matchScore ?? 0) < 50) : friends
+
+  function FriendRow({ f, dimmed = false }) {
+    const isSelected = selectedIds.has(f.id)
+    return (
+      <button
+        onClick={() => toggleSelect(f.id)}
+        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors text-left ${
+          isSelected ? 'bg-[#1DB954]/15 ring-1 ring-[#1DB954]/40' : dimmed ? 'hover:bg-[#3e3e3e] opacity-60' : 'hover:bg-[#3e3e3e]'
+        }`}
+      >
+        <div className="w-9 h-9 rounded-full bg-[#535353] flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
+          {f.displayName?.[0]?.toUpperCase() ?? '?'}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-white text-sm font-medium truncate">{f.displayName}</p>
+          <p className="text-[#B3B3B3] text-xs truncate">
+            {f.hasLiked ? 'Already liked this song' : `@${f.username}`}
+          </p>
+        </div>
+        {f.matchScore > 0 && (
+          <span className={`text-[10px] font-bold flex-shrink-0 ${(f.matchScore ?? 0) >= 50 ? 'text-[#1DB954]' : 'text-[#535353]'}`}>
+            {f.hasLiked ? '❤' : `${f.matchScore}%`}
+          </span>
+        )}
+        <div className={`w-4 h-4 rounded-full border flex items-center justify-center flex-shrink-0 ml-1 transition-colors ${
+          isSelected ? 'bg-[#1DB954] border-[#1DB954]' : 'border-[#535353]'
+        }`}>
+          {isSelected && <Check size={9} className="text-black" />}
+        </div>
+      </button>
+    )
+  }
 
   return (
     <>
-      {/* Header row: label + AI predict button */}
+      {/* Header row */}
       <div className="flex items-center justify-between mb-3">
-        <p className="text-[#B3B3B3] text-[11px] font-bold uppercase tracking-widest">
-          {aiMode ? 'Who might love this' : 'Share with'}
-        </p>
-        {!aiMode ? (
-          <button
-            onClick={handleAiPredict}
-            disabled={aiLoading || !activeSong}
-            className="flex items-center gap-1 text-[#1DB954] hover:text-[#1ed760] text-[11px] font-bold transition-colors disabled:opacity-50"
-          >
-            <Sparkles size={11} className={aiLoading ? 'animate-pulse' : ''} />
-            {aiLoading ? 'Predicting…' : 'AI Predict'}
-          </button>
-        ) : (
-          <button
-            onClick={() => { setAiMode(false); setAiSelected(new Set()) }}
-            className="text-[#535353] hover:text-white text-[11px] transition-colors"
-          >
-            Reset
-          </button>
-        )}
+        <p className="text-[#B3B3B3] text-[11px] font-bold uppercase tracking-widest">Share with</p>
+        <button
+          onClick={handleAiPredict}
+          disabled={aiLoading || !activeSong}
+          className="flex items-center gap-1 text-[#1DB954] hover:text-[#1ed760] text-[11px] font-bold transition-colors disabled:opacity-50"
+        >
+          <Sparkles size={11} className={aiLoading ? 'animate-pulse' : ''} />
+          {aiLoading ? 'Predicting…' : 'AI Predict'}
+        </button>
       </div>
 
-      {/* ── NORMAL MODE ── */}
-      {!aiMode && (
-        <div className="space-y-1 max-h-36 overflow-y-auto mb-4 pr-1">
-          {friends.map(f => (
-            <button
-              key={f.id}
-              onClick={() => setSelected(f)}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors text-left ${
-                selected?.id === f.id ? 'bg-[#1DB954]/15 ring-1 ring-[#1DB954]/40' : 'hover:bg-[#3e3e3e]'
-              }`}
-            >
-              <div className="w-9 h-9 rounded-full bg-[#535353] flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
-                {f.displayName?.[0]?.toUpperCase() ?? '?'}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-white text-sm font-medium truncate">{f.displayName}</p>
-                <p className="text-[#B3B3B3] text-xs truncate">@{f.username}</p>
-              </div>
-              {selected?.id === f.id && <Check size={15} className="text-[#1DB954] flex-shrink-0" />}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* ── AI MODE ── */}
-      {aiMode && (
-        <div className="max-h-44 overflow-y-auto mb-4 pr-1 space-y-3">
-          {highMatches.length > 0 && (
-            <div>
-              <p className="text-[#1DB954] text-[10px] font-bold uppercase tracking-widest mb-1.5 flex items-center gap-1">
-                <Sparkles size={9} /> Likely to love it
-              </p>
-              <div className="space-y-1">
-                {highMatches.map(f => (
-                  <button key={f.id} onClick={() => toggleAiSelect(f.id)}
-                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors text-left ${
-                      aiSelected.has(f.id) ? 'bg-[#1DB954]/15 ring-1 ring-[#1DB954]/40' : 'hover:bg-[#3e3e3e] opacity-60'
-                    }`}
-                  >
-                    <div className="w-9 h-9 rounded-full bg-[#535353] flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
-                      {f.displayName?.[0]?.toUpperCase() ?? '?'}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-white text-sm font-medium truncate">{f.displayName}</p>
-                      <p className="text-[#B3B3B3] text-xs truncate">
-                        {f.hasLiked ? 'Already liked this song' : `@${f.username}`}
-                      </p>
-                    </div>
-                    <span className="text-[#1DB954] text-[10px] font-bold flex-shrink-0">
-                      {f.hasLiked ? '❤' : `${f.matchScore}%`}
-                    </span>
-                    <div className={`w-4 h-4 rounded-full border flex items-center justify-center flex-shrink-0 ml-1 transition-colors ${
-                      aiSelected.has(f.id) ? 'bg-[#1DB954] border-[#1DB954]' : 'border-[#535353]'
-                    }`}>
-                      {aiSelected.has(f.id) && <Check size={9} className="text-black" />}
-                    </div>
-                  </button>
-                ))}
-              </div>
+      {/* Friends list — always multi-select */}
+      <div className="max-h-44 overflow-y-auto mb-4 pr-1 space-y-3">
+        {highMatches.length > 0 && (
+          <div>
+            <p className="text-[#1DB954] text-[10px] font-bold uppercase tracking-widest mb-1.5 flex items-center gap-1">
+              <Sparkles size={9} /> Likely to love it
+            </p>
+            <div className="space-y-1">
+              {highMatches.map(f => <FriendRow key={f.id} f={f} dimmed={!selectedIds.has(f.id)} />)}
             </div>
-          )}
-          {lowMatches.length > 0 && (
-            <div>
-              <p className="text-[#535353] text-[10px] font-bold uppercase tracking-widest mb-1.5">Other friends</p>
-              <div className="space-y-1">
-                {lowMatches.map(f => (
-                  <button key={f.id} onClick={() => toggleAiSelect(f.id)}
-                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors text-left ${
-                      aiSelected.has(f.id) ? 'bg-[#1DB954]/15 ring-1 ring-[#1DB954]/40' : 'hover:bg-[#3e3e3e]'
-                    }`}
-                  >
-                    <div className="w-9 h-9 rounded-full bg-[#535353] flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
-                      {f.displayName?.[0]?.toUpperCase() ?? '?'}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-white text-sm font-medium truncate">{f.displayName}</p>
-                      <p className="text-[#B3B3B3] text-xs truncate">@{f.username}</p>
-                    </div>
-                    {f.matchScore > 0 && <span className="text-[#535353] text-[10px] font-bold flex-shrink-0">{f.matchScore}%</span>}
-                    <div className={`w-4 h-4 rounded-full border flex items-center justify-center flex-shrink-0 ml-1 transition-colors ${
-                      aiSelected.has(f.id) ? 'bg-[#1DB954] border-[#1DB954]' : 'border-[#535353]'
-                    }`}>
-                      {aiSelected.has(f.id) && <Check size={9} className="text-black" />}
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
+          </div>
+        )}
+        {highMatches.length > 0 && otherFriends.length > 0 && (
+          <p className="text-[#535353] text-[10px] font-bold uppercase tracking-widest mb-1.5">Other friends</p>
+        )}
+        <div className="space-y-1">
+          {otherFriends.map(f => <FriendRow key={f.id} f={f} />)}
         </div>
-      )}
-
-      {/* AI song-suggest widget — only in normal mode when a friend is selected */}
-      {!aiMode && selected && (
-        <div className="mb-4">
-          <AiSuggestWidget friend={selected} onAccept={onSongChange} />
-        </div>
-      )}
+      </div>
 
       {/* Context note */}
-      {((!aiMode && selected) || (aiMode && aiSelected.size > 0)) && (
+      {selectedIds.size > 0 && (
         <div className="mb-4">
           <textarea
             value={context}
             onChange={e => setContext(e.target.value.slice(0, 200))}
-            placeholder={
-              aiMode
-                ? 'Add a note for everyone… (optional)'
-                : `Tell ${selected?.displayName} why you're sharing this… (optional)`
-            }
+            placeholder="Add a note… (optional)"
             rows={2}
             className="w-full bg-[#3e3e3e] text-white text-sm rounded-xl p-3 resize-none placeholder-[#6a6a6a] focus:outline-none focus:ring-1 focus:ring-[#1DB954]/50"
           />
@@ -366,14 +199,14 @@ function FriendsTab({ activeSong, onSongChange, onClose }) {
 
       <button
         onClick={handleSend}
-        disabled={aiMode ? aiSelected.size === 0 || !activeSong || sending : !selected || !activeSong || sending}
+        disabled={selectedIds.size === 0 || !activeSong || sending}
         className="w-full bg-[#1DB954] text-black font-bold py-3 rounded-full hover:bg-[#1ed760] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
       >
         {sending
           ? 'Sending…'
-          : aiMode
-            ? `Send to ${aiSelected.size} friend${aiSelected.size !== 1 ? 's' : ''}`
-            : 'Send Recommendation'}
+          : selectedIds.size > 0
+            ? `Send to ${selectedIds.size} friend${selectedIds.size !== 1 ? 's' : ''}`
+            : 'Select friends to share'}
       </button>
     </>
   )
@@ -502,8 +335,7 @@ function GroupsTab({ activeSong, onClose }) {
 // ── Main SharePanel ───────────────────────────────────────────────────────────
 
 export default function SharePanel({ song, onClose }) {
-  const [tab, setTab]               = useState('friends')
-  const [activeSong, setActiveSong] = useState(song)
+  const [tab, setTab] = useState('friends')
 
   return (
     <div
@@ -519,17 +351,17 @@ export default function SharePanel({ song, onClose }) {
           </button>
         </div>
 
-        {/* Active song card */}
+        {/* Song card */}
         <div className="flex items-center gap-3 bg-[#1a1a1a] rounded-xl p-3 mb-4">
           <div className="w-12 h-12 flex-shrink-0 rounded overflow-hidden bg-[#3e3e3e]">
-            {activeSong?.albumArtUrl
-              ? <img src={activeSong.albumArtUrl} alt={activeSong.album} className="w-full h-full object-cover" />
+            {song?.albumArtUrl
+              ? <img src={song.albumArtUrl} alt={song.album} className="w-full h-full object-cover" />
               : <div className="w-full h-full flex items-center justify-center"><Music size={18} className="text-[#B3B3B3]" /></div>
             }
           </div>
           <div className="min-w-0">
-            <p className="text-white font-semibold text-sm truncate">{activeSong?.title ?? 'No song selected'}</p>
-            <p className="text-[#B3B3B3] text-xs truncate">{activeSong?.artist ?? 'Pick a song or use AI'}</p>
+            <p className="text-white font-semibold text-sm truncate">{song?.title ?? 'No song selected'}</p>
+            <p className="text-[#B3B3B3] text-xs truncate">{song?.artist}</p>
           </div>
         </div>
 
@@ -552,8 +384,8 @@ export default function SharePanel({ song, onClose }) {
         </div>
 
         {tab === 'friends'
-          ? <FriendsTab activeSong={activeSong} onSongChange={setActiveSong} onClose={onClose} />
-          : <GroupsTab  activeSong={activeSong} onClose={onClose} />
+          ? <FriendsTab activeSong={song} onClose={onClose} />
+          : <GroupsTab  activeSong={song} onClose={onClose} />
         }
       </div>
     </div>
