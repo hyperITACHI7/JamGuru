@@ -564,4 +564,100 @@ ${songList}`;
   return { picks: orderedPicks, remaining };
 }
 
-module.exports = { suggestSong, suggestForMe, getInteractionContext, rankSongsForRequest, suggestForGroup, rankSongsForGroupRequest };
+async function buildDiscoveredList(prisma, userId) {
+  const [songLikes, receivedRecs] = await Promise.all([
+    prisma.songLike.findMany({
+      where: { userId },
+      include: { song: { select: { title: true, artist: true } } },
+    }),
+    prisma.recommendation.findMany({
+      where: { recipientId: userId },
+      include: { song: { select: { title: true, artist: true } } },
+      orderBy: { sentAt: 'desc' },
+      take: 150,
+    }),
+  ]);
+  const seen = new Set();
+  const list = [];
+  for (const { song } of [...songLikes, ...receivedRecs]) {
+    const key = `${song.title}||${song.artist}`;
+    if (!seen.has(key)) { seen.add(key); list.push(`"${song.title}" by ${song.artist}`); }
+  }
+  return list;
+}
+
+async function suggestForRequest(prisma, userId, requestId) {
+  const songRequest = await prisma.songRequest.findUnique({ where: { id: requestId } });
+  if (!songRequest) throw new Error('Request not found');
+  const requestText = songRequest.renderedText || '';
+  // Exclude songs the REQUESTER has already discovered (they're the one receiving the song)
+  const discovered = await buildDiscoveredList(prisma, songRequest.senderId);
+
+  const prompt = `You are a music recommendation assistant.\nSomeone sent this song request: "${requestText}"\nSuggest 3 real, existing songs that perfectly match this request.\n${discovered.length ? `NEVER suggest any of these — the user has already heard or discovered them:\n${discovered.slice(0, 60).join('; ')}\n` : ''}Return ONLY a valid JSON array of exactly 3 objects, no extra text:\n[{"title":"...","artist":"..."},{"title":"...","artist":"..."},{"title":"...","artist":"..."}]`;
+
+  const raw = await callAI(prompt, 0.9);
+  const jsonMatch = raw.match(/\[[\s\S]*?\]/);
+  if (!jsonMatch) throw new Error('AI returned unexpected format');
+  const suggestions = JSON.parse(jsonMatch[0]);
+  if (!Array.isArray(suggestions) || suggestions.length === 0) throw new Error('No suggestions returned');
+
+  const songs = [];
+  for (const { title, artist } of suggestions.slice(0, 3)) {
+    if (!title || !artist) continue;
+    try {
+      const tracks = await searchTracks(`${title} ${artist}`);
+      if (!tracks?.length) continue;
+      const song = tracks[0];
+      await prisma.song.upsert({ where: { spotifyId: song.spotifyId }, create: { ...song, cachedAt: new Date() }, update: { ...song, cachedAt: new Date() } });
+      enrichSongTags(prisma, song.spotifyId, song.title, song.artist);
+      songs.push(song);
+    } catch {}
+  }
+  return songs;
+}
+
+async function suggestForGroupRequest(prisma, userId, requestId) {
+  const songRequest = await prisma.groupSongRequest.findUnique({ where: { id: requestId } });
+  if (!songRequest) throw new Error('Request not found');
+  const requestText = songRequest.renderedText || '';
+
+  // Exclude songs the REQUESTER has already discovered (they're the one receiving the song)
+  const [discovered, groupRecs] = await Promise.all([
+    buildDiscoveredList(prisma, songRequest.senderId),
+    prisma.recommendation.findMany({
+      where: { groupId: songRequest.groupId },
+      include: { song: { select: { title: true, artist: true } } },
+      orderBy: { sentAt: 'desc' },
+      take: 50,
+    }),
+  ]);
+  const discoveredSet = new Set(discovered);
+  for (const { song } of groupRecs) {
+    const entry = `"${song.title}" by ${song.artist}`;
+    if (!discoveredSet.has(entry)) { discoveredSet.add(entry); discovered.push(entry); }
+  }
+
+  const prompt = `You are a music recommendation assistant.\nSomeone sent this song request: "${requestText}"\nSuggest 3 real, existing songs that perfectly match this request.\n${discovered.length ? `NEVER suggest any of these — the user has already heard or discovered them:\n${discovered.slice(0, 60).join('; ')}\n` : ''}Return ONLY a valid JSON array of exactly 3 objects, no extra text:\n[{"title":"...","artist":"..."},{"title":"...","artist":"..."},{"title":"...","artist":"..."}]`;
+
+  const raw = await callAI(prompt, 0.9);
+  const jsonMatch = raw.match(/\[[\s\S]*?\]/);
+  if (!jsonMatch) throw new Error('AI returned unexpected format');
+  const suggestions = JSON.parse(jsonMatch[0]);
+  if (!Array.isArray(suggestions) || suggestions.length === 0) throw new Error('No suggestions returned');
+
+  const songs = [];
+  for (const { title, artist } of suggestions.slice(0, 3)) {
+    if (!title || !artist) continue;
+    try {
+      const tracks = await searchTracks(`${title} ${artist}`);
+      if (!tracks?.length) continue;
+      const song = tracks[0];
+      await prisma.song.upsert({ where: { spotifyId: song.spotifyId }, create: { ...song, cachedAt: new Date() }, update: { ...song, cachedAt: new Date() } });
+      enrichSongTags(prisma, song.spotifyId, song.title, song.artist);
+      songs.push(song);
+    } catch {}
+  }
+  return songs;
+}
+
+module.exports = { suggestSong, suggestForMe, getInteractionContext, rankSongsForRequest, suggestForGroup, rankSongsForGroupRequest, suggestForRequest, suggestForGroupRequest };

@@ -1,7 +1,7 @@
 const express = require('express');
 const { PrismaClient } = require('@prisma/client');
 const auth = require('../../middleware/auth');
-const { suggestSong, suggestForMe, getInteractionContext, rankSongsForRequest, suggestForGroup, rankSongsForGroupRequest } = require('../../services/ai');
+const { suggestSong, suggestForMe, getInteractionContext, rankSongsForRequest, suggestForGroup, rankSongsForGroupRequest, suggestForRequest, suggestForGroupRequest } = require('../../services/ai');
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -136,6 +136,47 @@ router.post('/rank-for-group-request', auth, async (req, res) => {
   } catch (e) {
     console.error('[ai/rank-for-group-request]', e.message);
     res.status(500).json({ error: e.message || 'Failed to rank songs' });
+  }
+});
+
+// POST /api/ai/suggest-for-request — AI suggestions outside library for a DM request
+router.post('/ai/suggest-for-request', auth, async (req, res) => {
+  try {
+    if (!process.env.AI_API_KEY || process.env.AI_API_KEY === 'your-groq-api-key-here') {
+      return res.status(503).json({ error: 'AI provider not configured' });
+    }
+    const { requestId } = req.body;
+    if (!requestId) return res.status(400).json({ error: 'requestId is required' });
+    const songRequest = await prisma.songRequest.findUnique({ where: { id: requestId } });
+    if (!songRequest) return res.status(404).json({ error: 'Request not found' });
+    if (songRequest.recipientId !== req.userId) return res.status(403).json({ error: 'Not your request' });
+    const songs = await suggestForRequest(prisma, req.userId, requestId);
+    res.json({ songs });
+  } catch (e) {
+    console.error('[ai/suggest-for-request]', e.message);
+    res.status(500).json({ error: e.message || 'Failed to suggest songs' });
+  }
+});
+
+// POST /api/ai/suggest-for-group-request — AI suggestions outside library for a group request
+router.post('/ai/suggest-for-group-request', auth, async (req, res) => {
+  try {
+    if (!process.env.AI_API_KEY || process.env.AI_API_KEY === 'your-groq-api-key-here') {
+      return res.status(503).json({ error: 'AI provider not configured' });
+    }
+    const { requestId } = req.body;
+    if (!requestId) return res.status(400).json({ error: 'requestId is required' });
+    const songRequest = await prisma.groupSongRequest.findUnique({ where: { id: requestId } });
+    if (!songRequest) return res.status(404).json({ error: 'Request not found' });
+    const membership = await prisma.groupMember.findUnique({
+      where: { groupId_userId: { groupId: songRequest.groupId, userId: req.userId } },
+    });
+    if (!membership) return res.status(403).json({ error: 'Not a member of this group' });
+    const songs = await suggestForGroupRequest(prisma, req.userId, requestId);
+    res.json({ songs });
+  } catch (e) {
+    console.error('[ai/suggest-for-group-request]', e.message);
+    res.status(500).json({ error: e.message || 'Failed to suggest songs' });
   }
 });
 

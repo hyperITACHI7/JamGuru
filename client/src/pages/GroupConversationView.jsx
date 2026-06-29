@@ -14,7 +14,7 @@ import { getPlaylists, getPlaylist } from '../api/auth'
 import { REQUEST_TEMPLATES, renderTemplate, joinTags } from '../data/requestTemplates'
 import TagPicker from '../components/TagPicker'
 import { getTaste } from '../api/taste'
-import { getGroupAiSuggestion, rankForGroupRequest } from '../phase7/api/ai'
+import { getGroupAiSuggestion, rankForGroupRequest, suggestForGroupRequest } from '../phase7/api/ai'
 import { usePlayer } from '../context/PlayerContext'
 
 function formatTime(iso) {
@@ -277,10 +277,12 @@ export default function GroupConversationView({ group, onBack }) {
   const [taste, setTaste]                       = useState(null)
 
   // Reply picker
-  const [showReplyPicker, setShowReplyPicker]       = useState(false)
-  const [replyPickerLoading, setReplyPickerLoading] = useState(false)
-  const [replyPickerPicks, setReplyPickerPicks]     = useState([])
-  const [replyPickerRemaining, setReplyPickerRemaining] = useState([])
+  const [showReplyPicker, setShowReplyPicker]             = useState(false)
+  const [replyPickerLoading, setReplyPickerLoading]       = useState(false)
+  const [replyPickerPicks, setReplyPickerPicks]           = useState([])
+  const [replyPickerRemaining, setReplyPickerRemaining]   = useState([])
+  const [replyPickerExternal, setReplyPickerExternal]     = useState([])
+  const [replyPickerExternalLoading, setReplyPickerExternalLoading] = useState(false)
   const [replySearch, setReplySearch]               = useState('')
   const [replySearchResults, setReplySearchResults] = useState([])
   const [replySearchLoading, setReplySearchLoading] = useState(false)
@@ -394,15 +396,26 @@ export default function GroupConversationView({ group, onBack }) {
     setShowRequest(false)
     setReplySearch(''); setReplySearchResults([])
     setReplyPickerPicks([]); setReplyPickerRemaining([])
+    setReplyPickerExternal([])
     setReplyPickerLoading(true)
-    try {
-      const { data } = await rankForGroupRequest(requestId)
-      setReplyPickerPicks(data.picks || [])
-      setReplyPickerRemaining(data.remaining || [])
-    } catch (_) {
-      try { const { data } = await getLikedSongs(); setReplyPickerRemaining(data.songs || []) } catch (__) {}
+    setReplyPickerExternalLoading(true)
+    setLibraryView('playlists')
+    setActivePlaylist(null)
+    setLibrarySongs([])
+    if (playlists.length === 0 && !playlistsLoading) {
+      setPlaylistsLoading(true)
+      getPlaylists().then(({ data }) => setPlaylists(data.playlists || [])).catch(() => {}).finally(() => setPlaylistsLoading(false))
     }
-    setReplyPickerLoading(false)
+    rankForGroupRequest(requestId)
+      .then(({ data }) => { setReplyPickerPicks(data.picks || []); setReplyPickerRemaining(data.remaining || []) })
+      .catch(async () => {
+        try { const { data } = await getLikedSongs(); setReplyPickerRemaining(data.songs || []) } catch {}
+      })
+      .finally(() => setReplyPickerLoading(false))
+    suggestForGroupRequest(requestId)
+      .then(({ data }) => setReplyPickerExternal(data.songs || []))
+      .catch(() => {})
+      .finally(() => setReplyPickerExternalLoading(false))
   }
 
   function handleReplySearchChange(q) {
@@ -504,7 +517,6 @@ export default function GroupConversationView({ group, onBack }) {
   const requestTextMap = {}
   messages.forEach(m => { if (m.type === 'request') requestTextMap[m.id] = m.renderedText })
 
-  const replyPickerHasAiPicks = replyPickerPicks.length > 0
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -559,34 +571,70 @@ export default function GroupConversationView({ group, onBack }) {
 
       {/* ── Reply picker panel ── */}
       {showReplyPicker && (
-        <div className="flex-shrink-0 border-t border-white/5 bg-[#181818] flex flex-col" style={{ maxHeight: '340px' }}>
+        <div className="flex-shrink-0 border-t border-white/5 bg-[#181818] flex flex-col" style={{ maxHeight: 'min(480px, 60vh)' }}>
+          {/* Header */}
           <div className="flex items-center gap-2 px-4 pt-3 pb-2 flex-shrink-0">
-            <div className="flex-1 min-w-0">
-              <p className="text-purple-400 text-[9px] font-bold uppercase tracking-wider">Replying to</p>
-              <p className="text-white/50 text-[10px] truncate italic">"{activeRequestText}"</p>
-            </div>
-            <button onClick={() => { setShowReplyPicker(false); setPendingGroupRequestId(null) }}
+            {libraryView === 'songs' ? (
+              <>
+                <button onClick={backToPlaylists} className="text-[#B3B3B3] hover:text-white transition-colors flex-shrink-0">
+                  <ChevronLeft size={18} />
+                </button>
+                <span className="text-white text-xs font-semibold flex-1 truncate">{activePlaylist?.name ?? 'Library'}</span>
+              </>
+            ) : (
+              <div className="flex-1 min-w-0">
+                <p className="text-purple-400 text-[9px] font-bold uppercase tracking-wider">Replying to</p>
+                <p className="text-white/50 text-[10px] truncate italic">"{activeRequestText}"</p>
+              </div>
+            )}
+            <button onClick={() => { setShowReplyPicker(false); setPendingGroupRequestId(null); setLibraryView('playlists'); setActivePlaylist(null); setLibrarySongs([]) }}
               className="text-[#535353] hover:text-white transition-colors flex-shrink-0">
               <X size={16} />
             </button>
           </div>
 
-          <div className="px-4 pb-2 flex-shrink-0">
-            <div className="flex items-center gap-2 bg-[#282828] rounded-full px-3 py-1.5">
-              <Search size={12} className="text-[#535353] flex-shrink-0" />
-              <input ref={replySearchRef} value={replySearch}
-                onChange={e => handleReplySearchChange(e.target.value)}
-                placeholder="Search Spotify or browse below…"
-                className="flex-1 bg-transparent text-white text-xs focus:outline-none placeholder-[#535353]" />
-              {replySearch && (
-                <button onClick={() => { setReplySearch(''); setReplySearchResults([]) }}
-                  className="text-[#535353] hover:text-white"><X size={11} /></button>
-              )}
+          {/* Search bar — only in main browse view */}
+          {libraryView === 'playlists' && (
+            <div className="px-4 pb-2 flex-shrink-0">
+              <div className="flex items-center gap-2 bg-[#282828] rounded-full px-3 py-1.5">
+                <Search size={12} className="text-[#535353] flex-shrink-0" />
+                <input ref={replySearchRef} value={replySearch}
+                  onChange={e => handleReplySearchChange(e.target.value)}
+                  placeholder="Search Spotify…"
+                  className="flex-1 bg-transparent text-white text-xs focus:outline-none placeholder-[#535353]" />
+                {replySearch && (
+                  <button onClick={() => { setReplySearch(''); setReplySearchResults([]) }}
+                    className="text-[#535353] hover:text-white"><X size={11} /></button>
+                )}
+              </div>
             </div>
-          </div>
+          )}
 
+          {/* Content */}
           <div className="overflow-y-auto flex-1">
-            {replySearch.trim() ? (
+            {libraryView === 'songs' ? (
+              /* ── Playlist songs view ── */
+              libraryLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="w-5 h-5 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
+                </div>
+              ) : librarySongs.length === 0 ? (
+                <p className="text-center text-[#535353] text-xs py-8">This playlist is empty</p>
+              ) : librarySongs.map(song => (
+                <button key={song.spotifyId} onClick={() => selectSong(song)}
+                  className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/5 transition-colors text-left">
+                  <div className="w-9 h-9 flex-shrink-0 rounded-md overflow-hidden bg-[#282828]">
+                    {song.albumArtUrl ? <img src={song.albumArtUrl} alt={song.title} className="w-full h-full object-cover" />
+                      : <div className="w-full h-full flex items-center justify-center"><Music size={12} className="text-[#535353]" /></div>}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-white text-xs font-medium truncate">{song.title}</p>
+                    <p className="text-[#B3B3B3] text-[10px] truncate mt-0.5">{song.artist}</p>
+                  </div>
+                </button>
+              ))
+            ) : replySearch.trim() ? (
+              /* ── Spotify search results ── */
               replySearchLoading
                 ? <div className="flex items-center justify-center py-6"><div className="w-4 h-4 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" /></div>
                 : replySearchResults.length === 0
@@ -604,53 +652,72 @@ export default function GroupConversationView({ group, onBack }) {
                         </div>
                       </button>
                     ))
-            ) : replyPickerLoading ? (
-              <div className="flex flex-col items-center justify-center py-8 gap-2">
-                <div className="w-5 h-5 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
-                <p className="text-[#535353] text-[10px]">Finding best matches…</p>
-              </div>
             ) : (
+              /* ── 3-section browse ── */
               <>
-                {replyPickerHasAiPicks && (
-                  <p className="px-4 py-1.5 text-[9px] font-bold uppercase tracking-widest text-purple-400">
-                    ✨ AI picks for this request
-                  </p>
-                )}
-                {replyPickerPicks.map(song => (
-                  <button key={song.spotifyId} onClick={() => selectSong(song)}
+                {/* Sections 1+2 merged: AI Suggestions (external + library picks) */}
+                <p className="px-4 pt-2 pb-1.5 flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-widest text-purple-400">
+                  <Sparkles size={9} /> AI Suggestions
+                </p>
+                {(replyPickerExternalLoading || replyPickerLoading) &&
+                 replyPickerExternal.length === 0 && replyPickerPicks.length === 0 ? (
+                  <div className="flex items-center justify-center py-3 gap-2">
+                    <div className="w-4 h-4 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
+                    <p className="text-[#535353] text-[10px]">Finding songs…</p>
+                  </div>
+                ) : (() => {
+                  const seen = new Set()
+                  const combined = [...replyPickerExternal.slice(0, 3), ...replyPickerPicks.slice(0, 3)]
+                    .filter(s => { const ok = !seen.has(s.spotifyId); seen.add(s.spotifyId); return ok })
+                  if (combined.length === 0) return <p className="text-[#535353] text-[10px] px-4 pb-2">No suggestions found</p>
+                  return combined.map(song => (
+                    <button key={song.spotifyId} onClick={() => selectSong(song)}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/5 transition-colors text-left">
+                      <div className="w-9 h-9 flex-shrink-0 rounded-md overflow-hidden bg-[#282828]">
+                        {song.albumArtUrl ? <img src={song.albumArtUrl} alt={song.title} className="w-full h-full object-cover" />
+                          : <div className="w-full h-full flex items-center justify-center"><Music size={12} className="text-[#535353]" /></div>}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-white text-xs font-medium truncate">{song.title}</p>
+                        <p className="text-[#B3B3B3] text-[10px] truncate mt-0.5">{song.artist}</p>
+                      </div>
+                      {song.aiReason && <span className="text-[#535353] text-[9px] italic flex-shrink-0 max-w-[90px] text-right leading-tight">{song.aiReason}</span>}
+                    </button>
+                  ))
+                })()}
+
+                {/* Section 3: Library browser */}
+                <p className="px-4 pt-3 pb-1.5 text-[9px] font-bold uppercase tracking-widest text-[#535353] border-t border-white/5">
+                  Your Library
+                </p>
+                <button onClick={() => selectPlaylist({ type: 'liked', name: 'Liked Songs' })}
+                  className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/5 transition-colors text-left">
+                  <div className="w-9 h-9 flex-shrink-0 rounded-md bg-gradient-to-br from-[#450af5] to-[#c4efd9] flex items-center justify-center">
+                    <Heart size={14} className="text-white fill-white" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-white text-xs font-medium">Liked Songs</p>
+                  </div>
+                  <ChevronRight size={14} className="text-[#535353] flex-shrink-0" />
+                </button>
+                {playlistsLoading ? (
+                  <div className="flex items-center justify-center py-4">
+                    <div className="w-4 h-4 border-2 border-[#535353] border-t-transparent rounded-full animate-spin" />
+                  </div>
+                ) : playlists.map(pl => (
+                  <button key={pl.id} onClick={() => selectPlaylist({ ...pl, type: 'playlist' })}
                     className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/5 transition-colors text-left">
                     <div className="w-9 h-9 flex-shrink-0 rounded-md overflow-hidden bg-[#282828]">
-                      {song.albumArtUrl ? <img src={song.albumArtUrl} alt={song.title} className="w-full h-full object-cover" />
-                        : <div className="w-full h-full flex items-center justify-center"><Music size={12} className="text-[#535353]" /></div>}
+                      {pl.coverUrl ? <img src={pl.coverUrl} alt={pl.name} className="w-full h-full object-cover" />
+                        : <div className="w-full h-full flex items-center justify-center"><ListMusic size={12} className="text-[#535353]" /></div>}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-white text-xs font-medium truncate">{song.title}</p>
-                      <p className="text-[#B3B3B3] text-[10px] truncate mt-0.5">{song.artist}</p>
+                      <p className="text-white text-xs font-medium truncate">{pl.name}</p>
+                      <p className="text-[#B3B3B3] text-[10px] mt-0.5">{pl._count?.songs ?? 0} songs</p>
                     </div>
-                    {song.aiReason && <span className="text-[#535353] text-[9px] italic flex-shrink-0 max-w-[90px] text-right leading-tight">{song.aiReason}</span>}
+                    <ChevronRight size={14} className="text-[#535353] flex-shrink-0" />
                   </button>
                 ))}
-                {replyPickerRemaining.length > 0 && (
-                  <p className="px-4 py-1.5 text-[9px] font-bold uppercase tracking-widest text-[#535353] mt-1">
-                    {replyPickerHasAiPicks ? 'More from your library' : 'Your library'}
-                  </p>
-                )}
-                {replyPickerRemaining.map(song => (
-                  <button key={song.spotifyId} onClick={() => selectSong(song)}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/5 transition-colors text-left">
-                    <div className="w-9 h-9 flex-shrink-0 rounded-md overflow-hidden bg-[#282828]">
-                      {song.albumArtUrl ? <img src={song.albumArtUrl} alt={song.title} className="w-full h-full object-cover" />
-                        : <div className="w-full h-full flex items-center justify-center"><Music size={12} className="text-[#535353]" /></div>}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-white text-xs font-medium truncate">{song.title}</p>
-                      <p className="text-[#B3B3B3] text-[10px] truncate mt-0.5">{song.artist}</p>
-                    </div>
-                  </button>
-                ))}
-                {replyPickerPicks.length === 0 && replyPickerRemaining.length === 0 && !replyPickerLoading && (
-                  <p className="text-center text-[#535353] text-xs py-8">No songs in your library — search Spotify above</p>
-                )}
               </>
             )}
           </div>
@@ -836,8 +903,8 @@ export default function GroupConversationView({ group, onBack }) {
         </div>
       )}
 
-      {/* Compose bar */}
-      <div className="flex-shrink-0 border-t border-white/5 bg-[#181818] px-4 py-3">
+      {/* Compose bar — hidden when reply picker is open */}
+      {!showReplyPicker && <div className="flex-shrink-0 border-t border-white/5 bg-[#181818] px-4 py-3">
         {suggested ? (
           <div className="space-y-2">
             <div className="flex items-center gap-3 bg-[#282828] rounded-xl p-2.5">
@@ -898,7 +965,7 @@ export default function GroupConversationView({ group, onBack }) {
             </button>
           </div>
         )}
-      </div>
+      </div>}
     </div>
   )
 }
