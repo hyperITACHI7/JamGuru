@@ -43,13 +43,21 @@ router.post('/', auth, async (req, res) => {
     const song = await prisma.song.findUnique({ where: { spotifyId: songId } });
     if (!song) return res.status(404).json({ error: 'Song not found — search for it first' });
 
+    // Check if the recipient has already discovered this song before it arrives
+    const [alreadyLiked, alreadyInPlaylist] = await Promise.all([
+      prisma.songLike.findUnique({ where: { userId_spotifyId: { userId: recipientId, spotifyId: songId } } }),
+      prisma.playlistSong.findFirst({ where: { spotifyId: songId, playlist: { userId: recipientId } } }),
+    ]);
+    const preDiscovered = !!(alreadyLiked || alreadyInPlaylist);
+
     const rec = await prisma.recommendation.create({
       data: {
         senderId: req.userId,
         recipientId,
         songId,
-        context:   context?.trim() || null,
-        requestId: requestId ?? null,
+        context:      context?.trim() || null,
+        requestId:    requestId ?? null,
+        preDiscovered,
       },
       include: {
         song: true,
@@ -96,13 +104,9 @@ router.get('/inbox', auth, async (req, res) => {
   try {
     const recs = await prisma.recommendation.findMany({
       where: {
-        recipientId: req.userId,
-        dismissedAt: null,
-        // Only show songs the recipient hasn't discovered yet
-        song: {
-          songLikes:    { none: { userId: req.userId } },
-          playlistSongs: { none: { playlist: { userId: req.userId } } },
-        },
+        recipientId:  req.userId,
+        dismissedAt:  null,
+        preDiscovered: false,
       },
       include: {
         song: true,
