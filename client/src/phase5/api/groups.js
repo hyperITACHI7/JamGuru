@@ -16,4 +16,6 @@ export const likeGroupRec   = (groupId, recId) => api.post(`/groups/${groupId}/r
 export const unlikeGroupRec = (groupId, recId) => api.delete(`/groups/${groupId}/recommendations/${recId}/like`)
 
 export const getGroupScore    = (id)            => api.get(`/groups/${id}/score`)
-export const sendGroupRequest = (id, data)      => api.post(`/groups/${id}/requests`, data)
+export const sendGroupRequest     = (id, data)  => api.post(`/groups/${id}/requests`, data)
+export const updateGroupTaste     = (id, taste) => api.put(`/groups/${id}/taste`, taste)
+export const generateGroupTasteAI = (id)        => api.post(`/groups/${id}/taste/generate`)

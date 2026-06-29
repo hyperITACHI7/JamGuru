@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback, Component } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { Users, UserPlus, ArrowLeft, BarChart2, X, Globe, Lock, Settings } from 'lucide-react'
+import { Users, UserPlus, ArrowLeft, BarChart2, X, Globe, Lock, Settings, Sparkles, Plus } from 'lucide-react'
 import TopBar from '../../components/layout/TopBar'
 import GroupFeedCard from '../components/GroupFeedCard'
-import { getGroup, getGroupFeed, getGroupScore, addMember, removeMember, updateGroup } from '../api/groups'
+import { getGroup, getGroupFeed, getGroupScore, addMember, removeMember, updateGroup, updateGroupTaste, generateGroupTasteAI } from '../api/groups'
 import { searchUsers } from '../../phase3/api/friends'
 
 const me = () => JSON.parse(localStorage.getItem('user') || '{}')
@@ -197,6 +197,150 @@ function AddMemberPanel({ group, onAdded }) {
   )
 }
 
+// ── Group Taste Panel (creator only) ─────────────────────────────────────────
+
+const TASTE_CATEGORIES = [
+  { field: 'tasteGenres',  label: 'Genres' },
+  { field: 'tasteMoods',   label: 'Moods' },
+  { field: 'tasteArtists', label: 'Artists' },
+  { field: 'tasteEras',    label: 'Eras' },
+]
+
+function GroupTastePanel({ group, onUpdated }) {
+  const [taste, setTaste] = useState({
+    tasteGenres:  group.tasteGenres  ?? [],
+    tasteMoods:   group.tasteMoods   ?? [],
+    tasteArtists: group.tasteArtists ?? [],
+    tasteEras:    group.tasteEras    ?? [],
+  })
+  const [inputs,     setInputs]     = useState({ tasteGenres: '', tasteMoods: '', tasteArtists: '', tasteEras: '' })
+  const [generating, setGenerating] = useState(false)
+  const [saving,     setSaving]     = useState(false)
+  const [error,      setError]      = useState('')
+  const [saved,      setSaved]      = useState(false)
+
+  const isEmpty = TASTE_CATEGORIES.every(c => !taste[c.field]?.length)
+
+  function addTag(field) {
+    const tag = inputs[field].trim()
+    if (!tag || taste[field].includes(tag)) return
+    setTaste(prev => ({ ...prev, [field]: [...prev[field], tag] }))
+    setInputs(prev => ({ ...prev, [field]: '' }))
+  }
+
+  function removeTag(field, tag) {
+    setTaste(prev => ({ ...prev, [field]: prev[field].filter(t => t !== tag) }))
+  }
+
+  async function handleGenerate() {
+    setGenerating(true)
+    setError('')
+    try {
+      const { data } = await generateGroupTasteAI(group.id)
+      setTaste({ tasteGenres: data.tasteGenres, tasteMoods: data.tasteMoods, tasteArtists: data.tasteArtists, tasteEras: data.tasteEras })
+      onUpdated({ ...group, ...data })
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2500)
+    } catch (e) {
+      setError(e.response?.data?.error || 'AI generation failed. Try again.')
+    } finally {
+      setGenerating(false)
+    }
+  }
+
+  async function handleSave() {
+    setSaving(true)
+    setError('')
+    try {
+      const { data } = await updateGroupTaste(group.id, taste)
+      onUpdated({ ...group, ...data })
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2000)
+    } catch (e) {
+      setError(e.response?.data?.error || 'Failed to save')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const dirty = TASTE_CATEGORIES.some(c => JSON.stringify(taste[c.field]) !== JSON.stringify(group[c.field] ?? []))
+
+  return (
+    <div className="mt-8">
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <p className="text-[#B3B3B3] text-[11px] font-bold uppercase tracking-widest">Group Taste Profile</p>
+          <p className="text-[#535353] text-[10px] mt-0.5">Used by AI Suggest to pick songs that fit the group</p>
+        </div>
+        <button
+          onClick={handleGenerate}
+          disabled={generating}
+          className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full bg-purple-500/10 border border-purple-500/30 text-purple-300 hover:bg-purple-500/20 transition-colors disabled:opacity-40"
+        >
+          <Sparkles size={12} />
+          {generating ? 'Generating…' : 'Generate with AI'}
+        </button>
+      </div>
+
+      {isEmpty && !generating && (
+        <p className="text-[#535353] text-xs mb-4">
+          No taste profile set yet — generate one with AI or add tags manually below.
+        </p>
+      )}
+
+      {error && <p className="text-red-400 text-xs mb-3">{error}</p>}
+
+      <div className="space-y-4">
+        {TASTE_CATEGORIES.map(({ field, label }) => (
+          <div key={field}>
+            <p className="text-[#6a6a6a] text-[10px] font-semibold uppercase tracking-wider mb-2">{label}</p>
+            <div className="flex flex-wrap gap-1.5 mb-2">
+              {taste[field].map(tag => (
+                <span
+                  key={tag}
+                  className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full bg-purple-500/15 border border-purple-500/30 text-purple-200"
+                >
+                  {tag}
+                  <button
+                    onClick={() => removeTag(field, tag)}
+                    className="opacity-50 hover:opacity-100 transition-opacity ml-0.5"
+                  >
+                    <X size={9} />
+                  </button>
+                </span>
+              ))}
+            </div>
+            <div className="flex gap-2 max-w-xs">
+              <input
+                value={inputs[field]}
+                onChange={e => setInputs(prev => ({ ...prev, [field]: e.target.value }))}
+                onKeyDown={e => e.key === 'Enter' && addTag(field)}
+                placeholder={`Add ${label.toLowerCase().slice(0, -1)}…`}
+                className="flex-1 bg-[#282828] text-white text-xs rounded-full px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-purple-500/50 placeholder-[#535353]"
+              />
+              <button
+                onClick={() => addTag(field)}
+                disabled={!inputs[field].trim()}
+                className="w-7 h-7 rounded-full bg-purple-500/10 border border-purple-500/30 text-purple-300 flex items-center justify-center disabled:opacity-30 hover:bg-purple-500/20 transition-colors"
+              >
+                <Plus size={12} />
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <button
+        onClick={handleSave}
+        disabled={saving || !dirty}
+        className="mt-5 w-full bg-purple-600 text-white font-bold py-3 rounded-full hover:bg-purple-500 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+      >
+        {saving ? 'Saving…' : saved ? 'Saved!' : 'Save Taste Profile'}
+      </button>
+    </div>
+  )
+}
+
 // ── Settings Panel (creator only) ─────────────────────────────────────────────
 
 function SettingsPanel({ group, onUpdated }) {
@@ -274,6 +418,8 @@ function SettingsPanel({ group, onUpdated }) {
       >
         {saving ? 'Saving…' : saved ? 'Saved!' : 'Save Settings'}
       </button>
+
+      <GroupTastePanel group={group} onUpdated={onUpdated} />
     </div>
   )
 }

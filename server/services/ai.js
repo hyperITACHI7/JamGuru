@@ -564,6 +564,81 @@ ${songList}`;
   return { picks: orderedPicks, remaining };
 }
 
+async function suggestFromLibraryForFriend(prisma, senderId, friendId) {
+  const [directLikes, recLikes, friendProfile, friendTagProfile] = await Promise.all([
+    prisma.songLike.findMany({
+      where: { userId: senderId },
+      include: { song: true },
+      orderBy: { likedAt: 'desc' },
+      take: 60,
+    }),
+    prisma.like.findMany({
+      where: { likerId: senderId },
+      include: { recommendation: { include: { song: true } } },
+      orderBy: { likedAt: 'desc' },
+      take: 60,
+    }),
+    prisma.user.findUnique({
+      where:  { id: friendId },
+      select: { tasteGenres: true, tasteMoods: true, tasteArtists: true, tasteEras: true },
+    }),
+    prisma.likeFeedback.groupBy({
+      by: ['tag'],
+      where: { like: { recommendation: { recipientId: friendId }, likerId: friendId } },
+      _count: { tag: true },
+      orderBy: { _count: { tag: 'desc' } },
+    }),
+  ]);
+
+  // Build sender's library (deduped)
+  const seen = new Set();
+  const songs = [];
+  for (const sl of directLikes) {
+    if (!seen.has(sl.spotifyId)) { seen.add(sl.spotifyId); songs.push(sl.song); }
+  }
+  for (const like of recLikes) {
+    const song = like.recommendation?.song;
+    if (song && !seen.has(song.spotifyId)) { seen.add(song.spotifyId); songs.push(song); }
+  }
+  if (songs.length === 0) return null;
+
+  // Filter out songs the friend has already discovered
+  const friendDiscovered = await buildDiscoveredList(prisma, friendId);
+  const discoveredLower  = new Set(friendDiscovered.map(d => d.toLowerCase()));
+  const eligible = songs.filter(s =>
+    !discoveredLower.has(`"${s.title}" by ${s.artist}`.toLowerCase())
+  );
+  if (eligible.length === 0) return null;
+
+  const pool    = eligible.slice(0, 50);
+  const songList = pool.map((s, i) => `${i + 1}. "${s.title}" by ${s.artist} [${s.spotifyId}]`).join('\n');
+
+  // Build friend's taste summary
+  const profile = friendProfile || {};
+  const tasteParts = [];
+  if (profile.tasteGenres?.length)  tasteParts.push(`Genres: ${profile.tasteGenres.join(', ')}`);
+  if (profile.tasteMoods?.length)   tasteParts.push(`Moods: ${profile.tasteMoods.join(', ')}`);
+  if (profile.tasteArtists?.length) tasteParts.push(`Artists: ${profile.tasteArtists.join(', ')}`);
+  if (profile.tasteEras?.length)    tasteParts.push(`Era: ${profile.tasteEras.join(', ')}`);
+  const tasteStr = tasteParts.length > 0 ? tasteParts.join(' · ') : null;
+  const topTags  = friendTagProfile.slice(0, 5).map(t => `${t.tag} (${t._count.tag}×)`).join(', ');
+
+  let prompt = `You are a music recommendation assistant.\n`;
+  if (tasteStr) prompt += `Recipient's taste profile: ${tasteStr}\n`;
+  if (topTags)  prompt += `Their reaction tags on songs they love: ${topTags}\n`;
+  prompt += `\nPick the single best song from this list to recommend to them. Return ONLY valid JSON:\n{"spotifyId":"..."}\n\nAvailable songs:\n${songList}`;
+
+  try {
+    const raw = await callAI(prompt, 0.3);
+    const jsonMatch = raw.match(/\{[\s\S]*?\}/);
+    if (!jsonMatch) return null;
+    const { spotifyId } = JSON.parse(jsonMatch[0]);
+    return pool.find(s => s.spotifyId === spotifyId) || null;
+  } catch {
+    return null;
+  }
+}
+
 async function buildDiscoveredList(prisma, userId) {
   const [songLikes, receivedRecs] = await Promise.all([
     prisma.songLike.findMany({
@@ -660,4 +735,114 @@ async function suggestForGroupRequest(prisma, userId, requestId) {
   return songs;
 }
 
-module.exports = { suggestSong, suggestForMe, getInteractionContext, rankSongsForRequest, suggestForGroup, rankSongsForGroupRequest, suggestForRequest, suggestForGroupRequest };
+async function suggestFromLibraryForGroup(prisma, senderId, groupId) {
+  const [directLikes, recLikes, group, groupHistory] = await Promise.all([
+    prisma.songLike.findMany({ where: { userId: senderId }, include: { song: true }, orderBy: { likedAt: 'desc' }, take: 60 }),
+    prisma.like.findMany({ where: { likerId: senderId }, include: { recommendation: { include: { song: true } } }, orderBy: { likedAt: 'desc' }, take: 60 }),
+    prisma.group.findUnique({
+      where:  { id: groupId },
+      select: { tasteGenres: true, tasteMoods: true, tasteArtists: true, tasteEras: true },
+    }),
+    prisma.recommendation.findMany({
+      where:     { groupId },
+      select:    { song: { select: { spotifyId: true } } },
+      orderBy:   { sentAt: 'desc' },
+      take:      100,
+    }),
+  ]);
+
+  const seen = new Set();
+  const songs = [];
+  for (const sl of directLikes) {
+    if (!seen.has(sl.spotifyId)) { seen.add(sl.spotifyId); songs.push(sl.song); }
+  }
+  for (const like of recLikes) {
+    const song = like.recommendation?.song;
+    if (song && !seen.has(song.spotifyId)) { seen.add(song.spotifyId); songs.push(song); }
+  }
+  if (songs.length === 0) return null;
+
+  const groupSharedIds = new Set(groupHistory.map(r => r.song.spotifyId));
+  const eligible = songs.filter(s => !groupSharedIds.has(s.spotifyId));
+  if (eligible.length === 0) return null;
+
+  const profile = group || {};
+  const tasteParts = [];
+  if (profile.tasteGenres?.length)  tasteParts.push(`Genres: ${profile.tasteGenres.join(', ')}`);
+  if (profile.tasteMoods?.length)   tasteParts.push(`Moods: ${profile.tasteMoods.join(', ')}`);
+  if (profile.tasteArtists?.length) tasteParts.push(`Artists: ${profile.tasteArtists.join(', ')}`);
+  if (profile.tasteEras?.length)    tasteParts.push(`Era: ${profile.tasteEras.join(', ')}`);
+  const tasteStr = tasteParts.length > 0 ? tasteParts.join(' · ') : null;
+
+  const pool     = eligible.slice(0, 50);
+  const songList = pool.map((s, i) => `${i + 1}. "${s.title}" by ${s.artist} [${s.spotifyId}]`).join('\n');
+
+  let prompt = `You are a music recommendation assistant for a group chat.\n`;
+  if (tasteStr) prompt += `Group taste profile: ${tasteStr}\n`;
+  else prompt += `No group taste profile set — pick a song with broad appeal.\n`;
+  prompt += `\nPick the single best song from this list to share in the group. Return ONLY valid JSON:\n{"spotifyId":"..."}\n\nAvailable songs:\n${songList}`;
+
+  try {
+    const raw = await callAI(prompt, 0.3);
+    const jsonMatch = raw.match(/\{[\s\S]*?\}/);
+    if (!jsonMatch) return null;
+    const { spotifyId } = JSON.parse(jsonMatch[0]);
+    return pool.find(s => s.spotifyId === spotifyId) || null;
+  } catch {
+    return null;
+  }
+}
+
+async function generateGroupTaste(prisma, groupId) {
+  const [group, groupHistory] = await Promise.all([
+    prisma.group.findUnique({
+      where:   { id: groupId },
+      select:  {
+        name:    true,
+        members: { include: { user: { select: { displayName: true, tasteGenres: true, tasteMoods: true, tasteArtists: true, tasteEras: true } } } },
+      },
+    }),
+    prisma.recommendation.findMany({
+      where:   { groupId },
+      select:  { song: { select: { title: true, artist: true } } },
+      orderBy: { sentAt: 'desc' },
+      take:    50,
+    }),
+  ]);
+
+  if (!group) throw new Error('Group not found');
+
+  const memberProfiles = group.members.map(m => {
+    const u = m.user;
+    const parts = [];
+    if (u.tasteGenres?.length)  parts.push(`Genres: ${u.tasteGenres.join(', ')}`);
+    if (u.tasteMoods?.length)   parts.push(`Moods: ${u.tasteMoods.join(', ')}`);
+    if (u.tasteArtists?.length) parts.push(`Artists: ${u.tasteArtists.join(', ')}`);
+    if (u.tasteEras?.length)    parts.push(`Era: ${u.tasteEras.join(', ')}`);
+    return `${u.displayName}: ${parts.length > 0 ? parts.join(' · ') : 'no taste profile set'}`;
+  }).join('\n');
+
+  const recentSongs = groupHistory.slice(0, 30).map(r => `"${r.song.title}" by ${r.song.artist}`).join(', ');
+
+  let prompt = `You are building a collective taste profile for a music group called "${group.name}".\n\n`;
+  prompt += `Member taste profiles:\n${memberProfiles}\n\n`;
+  if (recentSongs) prompt += `Recent songs shared in this group:\n${recentSongs}\n\n`;
+  prompt += `Derive a collective taste profile that best represents this group's music taste.\n`;
+  prompt += `Return ONLY valid JSON, up to 5 values per array, empty array if no clear signal:\n{"genres":[],"moods":[],"artists":[],"eras":[]}`;
+
+  const raw = await callAI(prompt, 0.2);
+  const jsonMatch = raw.match(/\{[\s\S]*?\}/);
+  if (!jsonMatch) throw new Error('AI returned unexpected format');
+
+  const { genres = [], moods = [], artists = [], eras = [] } = JSON.parse(jsonMatch[0]);
+
+  const updated = await prisma.group.update({
+    where: { id: groupId },
+    data:  { tasteGenres: genres, tasteMoods: moods, tasteArtists: artists, tasteEras: eras, tasteUpdatedAt: new Date() },
+    select: { tasteGenres: true, tasteMoods: true, tasteArtists: true, tasteEras: true, tasteUpdatedAt: true },
+  });
+
+  return updated;
+}
+
+module.exports = { suggestSong, suggestForMe, getInteractionContext, rankSongsForRequest, suggestForGroup, rankSongsForGroupRequest, suggestForRequest, suggestForGroupRequest, suggestFromLibraryForFriend, suggestFromLibraryForGroup, generateGroupTaste };

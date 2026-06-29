@@ -208,6 +208,12 @@ model Group {
   createdBy   String   @map("created_by")
   createdAt   DateTime @default(now()) @map("created_at")
 
+  tasteGenres    String[]  @default([]) @map("taste_genres")
+  tasteMoods     String[]  @default([]) @map("taste_moods")
+  tasteArtists   String[]  @default([]) @map("taste_artists")
+  tasteEras      String[]  @default([]) @map("taste_eras")
+  tasteUpdatedAt DateTime? @map("taste_updated_at")
+
   creator         User              @relation("GroupCreator", fields: [createdBy], references: [id], onDelete: Cascade)
   members         GroupMember[]
   groupScores     GroupScore[]

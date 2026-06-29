@@ -509,4 +509,46 @@ router.get('/:id/score', auth, async (req, res) => {
   }
 });
 
+// ── Group taste profile ─────────────────────────────────────────────────────
+
+const { generateGroupTaste } = require('../../services/ai');
+
+// PUT /api/groups/:id/taste — manually set group taste (creator only)
+router.put('/:id/taste', auth, async (req, res) => {
+  try {
+    const group = await prisma.group.findUnique({ where: { id: req.params.id }, select: { createdBy: true } });
+    if (!group) return res.status(404).json({ error: 'Group not found' });
+    if (group.createdBy !== req.userId) return res.status(403).json({ error: 'Only the group creator can edit the taste profile' });
+
+    const { tasteGenres = [], tasteMoods = [], tasteArtists = [], tasteEras = [] } = req.body;
+    const updated = await prisma.group.update({
+      where:  { id: req.params.id },
+      data:   { tasteGenres, tasteMoods, tasteArtists, tasteEras, tasteUpdatedAt: new Date() },
+      select: { tasteGenres: true, tasteMoods: true, tasteArtists: true, tasteEras: true, tasteUpdatedAt: true },
+    });
+    res.json(updated);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// POST /api/groups/:id/taste/generate — AI-generate group taste (creator only)
+router.post('/:id/taste/generate', auth, async (req, res) => {
+  try {
+    if (!process.env.AI_API_KEY || process.env.AI_API_KEY === 'your-groq-api-key-here') {
+      return res.status(503).json({ error: 'AI provider not configured' });
+    }
+    const group = await prisma.group.findUnique({ where: { id: req.params.id }, select: { createdBy: true } });
+    if (!group) return res.status(404).json({ error: 'Group not found' });
+    if (group.createdBy !== req.userId) return res.status(403).json({ error: 'Only the group creator can generate the taste profile' });
+
+    const taste = await generateGroupTaste(prisma, req.params.id);
+    res.json(taste);
+  } catch (e) {
+    console.error('[taste/generate]', e.message);
+    res.status(500).json({ error: e.message || 'AI generation failed' });
+  }
+});
+
 module.exports = router;

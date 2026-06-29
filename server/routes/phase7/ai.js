@@ -1,7 +1,7 @@
 const express = require('express');
 const { PrismaClient } = require('@prisma/client');
 const auth = require('../../middleware/auth');
-const { suggestSong, suggestForMe, getInteractionContext, rankSongsForRequest, suggestForGroup, rankSongsForGroupRequest, suggestForRequest, suggestForGroupRequest } = require('../../services/ai');
+const { suggestSong, suggestForMe, getInteractionContext, rankSongsForRequest, suggestForGroup, rankSongsForGroupRequest, suggestForRequest, suggestForGroupRequest, suggestFromLibraryForFriend, suggestFromLibraryForGroup } = require('../../services/ai');
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -58,13 +58,14 @@ router.post('/ai/suggest/:friendId', auth, async (req, res) => {
 
     if (!friend) return res.status(404).json({ error: 'Friend not found' });
 
-    const { song, aiQuery } = await suggestSong(
-      prisma,
-      req.userId,
-      req.params.friendId,
-      me.displayName,
-      friend.displayName
-    );
+    // Try sender's library first — pick the best match for the friend's taste
+    let song    = await suggestFromLibraryForFriend(prisma, req.userId, req.params.friendId);
+    let aiQuery = null;
+
+    if (!song) {
+      // Library empty or no undiscovered match — fall back to free Spotify search
+      ({ song, aiQuery } = await suggestSong(prisma, req.userId, req.params.friendId, me.displayName, friend.displayName));
+    }
 
     res.json({ song, aiQuery });
   } catch (e) {
@@ -106,7 +107,14 @@ router.post('/suggest/group/:groupId', auth, async (req, res) => {
     });
     if (!membership) return res.status(403).json({ error: 'You are not a member of this group' });
 
-    const { song, aiQuery } = await suggestForGroup(prisma, req.userId, req.params.groupId);
+    // Try sender's library first (uses stored group taste profile)
+    let song    = await suggestFromLibraryForGroup(prisma, req.userId, req.params.groupId);
+    let aiQuery = null;
+
+    if (!song) {
+      ({ song, aiQuery } = await suggestForGroup(prisma, req.userId, req.params.groupId));
+    }
+
     res.json({ song, aiQuery });
   } catch (e) {
     console.error('[ai/suggest/group]', e.message);
