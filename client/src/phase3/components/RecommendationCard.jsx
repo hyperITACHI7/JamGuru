@@ -21,7 +21,7 @@ function formatDate(iso) {
 export default function RecommendationCard({ rec: initialRec }) {
   const [rec, setRec]           = useState(initialRec)
   const [liking, setLiking]     = useState(false)
-  const [reaction, setReaction] = useState(null) // null | 'dismiss' | 'dislike'
+  const [reaction, setReaction] = useState(initialRec.disliked ? 'dislike' : null)
   const [showTags, setShowTags] = useState(false)
   const player   = usePlayer()
   const isActive = player.isActive(rec.song)

@@ -37,7 +37,12 @@ function groupByTime(recs) {
     else                               buckets[4].recs.push(rec)
   }
 
-  return buckets.filter(b => b.recs.length > 0)
+  return buckets
+    .filter(b => b.recs.length > 0)
+    .map(b => ({
+      ...b,
+      recs: [...b.recs.filter(r => !r.disliked), ...b.recs.filter(r => r.disliked)],
+    }))
 }
 
 export default function JamGuru() {

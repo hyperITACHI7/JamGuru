@@ -104,12 +104,20 @@ router.get('/inbox', auth, async (req, res) => {
   try {
     const recs = await prisma.recommendation.findMany({
       where: {
-        recipientId:  req.userId,
-        dismissedAt:  null,
+        recipientId:   req.userId,
         preDiscovered: false,
+        OR: [
+          { dismissedAt: null },
+          // Disliked ("not my vibe") — show but disabled
+          { dismissedAt: { not: null }, song: { songDislikes: { some: { userId: req.userId } } } },
+        ],
       },
       include: {
-        song: true,
+        song: {
+          include: {
+            songDislikes: { where: { userId: req.userId }, select: { id: true } },
+          },
+        },
         sender: { select: SAFE_USER },
         likes: { where: { likerId: req.userId }, select: { id: true } },
         _count: { select: { likes: true } },
@@ -118,16 +126,20 @@ router.get('/inbox', auth, async (req, res) => {
       take: 100,
     });
 
-    let mapped = recs.map(r => ({
-      id: r.id,
-      sentAt: r.sentAt,
-      context: r.context,
-      song: r.song,
-      sender: r.sender,
-      liked: r.likes.length > 0,
-      likeId: r.likes[0]?.id ?? null,
-      likeCount: r._count.likes,
-    }));
+    let mapped = recs.map(r => {
+      const { songDislikes, ...songData } = r.song;
+      return {
+        id:        r.id,
+        sentAt:    r.sentAt,
+        context:   r.context,
+        song:      songData,
+        sender:    r.sender,
+        liked:     r.likes.length > 0,
+        likeId:    r.likes[0]?.id ?? null,
+        likeCount: r._count.likes,
+        disliked:  songDislikes.length > 0,
+      };
+    });
 
     if (req.query.sort === 'score' && mapped.length > 0) {
       const month = thisMonthStart();
