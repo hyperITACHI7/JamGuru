@@ -51,20 +51,27 @@ router.post('/ai/suggest/:friendId', auth, async (req, res) => {
       return res.status(503).json({ error: 'AI provider not configured. Set AI_API_KEY in server/.env' });
     }
 
-    const [me, friend] = await Promise.all([
-      prisma.user.findUnique({ where: { id: req.userId }, select: SAFE_USER }),
-      prisma.user.findUnique({ where: { id: req.params.friendId }, select: SAFE_USER }),
+    const { excludeSpotifyIds = [] } = req.body;
+
+    const [[me, friend], excludedSongs] = await Promise.all([
+      Promise.all([
+        prisma.user.findUnique({ where: { id: req.userId }, select: SAFE_USER }),
+        prisma.user.findUnique({ where: { id: req.params.friendId }, select: SAFE_USER }),
+      ]),
+      excludeSpotifyIds.length > 0
+        ? prisma.song.findMany({ where: { spotifyId: { in: excludeSpotifyIds } }, select: { spotifyId: true, title: true, artist: true } })
+        : Promise.resolve([]),
     ]);
 
     if (!friend) return res.status(404).json({ error: 'Friend not found' });
 
     // Try sender's library first — pick the best match for the friend's taste
-    let song    = await suggestFromLibraryForFriend(prisma, req.userId, req.params.friendId);
+    let song    = await suggestFromLibraryForFriend(prisma, req.userId, req.params.friendId, excludeSpotifyIds);
     let aiQuery = null;
 
     if (!song) {
-      // Library empty or no undiscovered match — fall back to free Spotify search
-      ({ song, aiQuery } = await suggestSong(prisma, req.userId, req.params.friendId, me.displayName, friend.displayName));
+      // Library empty or no undiscovered match — fall back to AI search
+      ({ song, aiQuery } = await suggestSong(prisma, req.userId, req.params.friendId, me.displayName, friend.displayName, excludedSongs));
     }
 
     res.json({ song, aiQuery });

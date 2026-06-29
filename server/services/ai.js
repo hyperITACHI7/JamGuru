@@ -241,9 +241,18 @@ function buildPrompt(context, senderName, friendName) {
   return prompt;
 }
 
-async function suggestSong(prisma, senderId, friendId, senderName, friendName) {
+async function suggestSong(prisma, senderId, friendId, senderName, friendName, extraExclusionSongs = []) {
   const context = await getInteractionContext(prisma, senderId, friendId);
-  const prompt  = buildPrompt(context, senderName, friendName);
+  let prompt    = buildPrompt(context, senderName, friendName);
+
+  // Append session-level exclusions (songs shown this session but not yet sent)
+  if (extraExclusionSongs.length > 0) {
+    const extraList = extraExclusionSongs.map(s => `"${s.title}" by ${s.artist}`).join('; ');
+    prompt = prompt.replace(
+      '\nReturn only valid JSON with no extra text: {"title":"...","artist":"..."}',
+      `\nAlso NEVER suggest these (already shown this session): ${extraList}\nReturn only valid JSON with no extra text: {"title":"...","artist":"..."}`
+    );
+  }
 
   const raw = await callAI(prompt);
 
@@ -254,11 +263,12 @@ async function suggestSong(prisma, senderId, friendId, senderName, friendName) {
 
   if (!title || !artist) throw new Error('AI response missing title or artist');
 
-  // Look up the real track on iTunes
+  // Look up the real track on iTunes; skip any track that was already shown this session
   const tracks = await searchTracks(`${title} ${artist}`);
   if (!tracks || tracks.length === 0) throw new Error(`No tracks found for "${title}" by ${artist}`);
 
-  const song = tracks[0];
+  const excludeIds = new Set(extraExclusionSongs.map(s => s.spotifyId));
+  const song = tracks.find(t => !excludeIds.has(t.spotifyId)) ?? tracks[0];
 
   // Cache the song so the recommendations endpoint can find it
   await prisma.song.upsert({
@@ -564,7 +574,7 @@ ${songList}`;
   return { picks: orderedPicks, remaining };
 }
 
-async function suggestFromLibraryForFriend(prisma, senderId, friendId) {
+async function suggestFromLibraryForFriend(prisma, senderId, friendId, excludeSpotifyIds = []) {
   const [directLikes, recLikes, friendProfile, friendTagProfile] = await Promise.all([
     prisma.songLike.findMany({
       where: { userId: senderId },
@@ -602,11 +612,13 @@ async function suggestFromLibraryForFriend(prisma, senderId, friendId) {
   }
   if (songs.length === 0) return null;
 
-  // Filter out songs the friend has already discovered
+  // Filter out songs the friend has already discovered or seen this session
   const friendDiscovered = await buildDiscoveredList(prisma, friendId);
   const discoveredLower  = new Set(friendDiscovered.map(d => d.toLowerCase()));
+  const excludeIdSet     = new Set(excludeSpotifyIds);
   const eligible = songs.filter(s =>
-    !discoveredLower.has(`"${s.title}" by ${s.artist}`.toLowerCase())
+    !discoveredLower.has(`"${s.title}" by ${s.artist}`.toLowerCase()) &&
+    !excludeIdSet.has(s.spotifyId)
   );
   if (eligible.length === 0) return null;
 

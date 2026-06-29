@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import {
   ArrowLeft, Play, Pause, Heart, Music, MessageCircle, Sparkles, Send, X,
-  ChevronRight, ThumbsDown, Plus, Search, ChevronLeft, ListMusic, Reply,
+  ChevronRight, ThumbsDown, Plus, Search, ChevronLeft, ListMusic, Reply, RefreshCw,
 } from 'lucide-react'
 import FriendProfileSheet from '../components/FriendProfileSheet'
 import { getConversation, sendRecommendation } from '../phase3/api/recommendations'
@@ -238,11 +238,12 @@ export default function ConversationView({ friend, onBack }) {
   const [justLikedIds, setJustLikedIds] = useState(new Set())
 
   // Compose: AI suggest / library pick
-  const [suggesting, setSuggesting]     = useState(false)
-  const [suggested, setSuggested]       = useState(null)
-  const [suggestNote, setSuggestNote]   = useState('')
-  const [sending, setSending]           = useState(false)
-  const [suggestError, setSuggestError] = useState('')
+  const [suggesting, setSuggesting]         = useState(false)
+  const [suggested, setSuggested]           = useState(null)
+  const [suggestNote, setSuggestNote]       = useState('')
+  const [sending, setSending]               = useState(false)
+  const [suggestError, setSuggestError]     = useState('')
+  const [seenSpotifyIds, setSeenSpotifyIds] = useState(new Set())
 
   // Library picker — two-level: playlists → songs
   const [showLibrary, setShowLibrary]           = useState(false)
@@ -508,8 +509,9 @@ export default function ConversationView({ friend, onBack }) {
     setSuggestError('')
     setSuggested(null)
     try {
-      const { data } = await getAiSuggestion(friend.id)
+      const { data } = await getAiSuggestion(friend.id, [...seenSpotifyIds])
       setSuggested(data)
+      setSeenSpotifyIds(prev => new Set([...prev, data.song.spotifyId]))
     } catch (e) {
       setSuggestError(e.response?.data?.error || 'AI suggestion failed. Try again.')
     } finally {
@@ -992,6 +994,14 @@ export default function ConversationView({ friend, onBack }) {
                   <Reply size={8} /> reply
                 </span>
               )}
+              <button
+                onClick={handleAiSuggest}
+                disabled={suggesting}
+                title="Try a different song"
+                className="text-[#535353] hover:text-[#1DB954] transition-colors ml-1 disabled:opacity-40"
+              >
+                <RefreshCw size={14} className={suggesting ? 'animate-spin' : ''} />
+              </button>
               <button onClick={() => { setSuggested(null); setSuggestNote(''); setSuggestError(''); setPendingRequestId(null) }}
                 className="text-[#535353] hover:text-white transition-colors ml-1">
                 <X size={14} />
