@@ -156,11 +156,17 @@ router.post('/songs/:id/dislike', auth, async (req, res) => {
     const song = await prisma.song.findUnique({ where: { spotifyId: req.params.id } });
     if (!song) return res.status(404).json({ error: 'Song not cached — search for it first' });
 
-    await prisma.songDislike.upsert({
-      where: { userId_spotifyId: { userId: req.userId, spotifyId: req.params.id } },
-      create: { userId: req.userId, spotifyId: req.params.id },
-      update: {},
-    });
+    await Promise.all([
+      prisma.songDislike.upsert({
+        where: { userId_spotifyId: { userId: req.userId, spotifyId: req.params.id } },
+        create: { userId: req.userId, spotifyId: req.params.id },
+        update: {},
+      }),
+      prisma.songLike.deleteMany({ where: { userId: req.userId, spotifyId: req.params.id } }),
+      prisma.playlistSong.deleteMany({
+        where: { spotifyId: req.params.id, playlist: { userId: req.userId } },
+      }),
+    ]);
     refreshTasteProfile(prisma, req.userId).catch(() => {});
     res.json({ disliked: true });
   } catch (e) {
@@ -195,11 +201,18 @@ router.post('/recommendations/:id/dislike', auth, async (req, res) => {
     if (!rec) return res.status(404).json({ error: 'Recommendation not found' });
     if (rec.recipientId !== req.userId) return res.status(403).json({ error: 'Not your recommendation' });
 
-    await prisma.songDislike.upsert({
-      where: { userId_spotifyId: { userId: req.userId, spotifyId: rec.songId } },
-      create: { userId: req.userId, spotifyId: rec.songId },
-      update: {},
-    });
+    await Promise.all([
+      prisma.songDislike.upsert({
+        where: { userId_spotifyId: { userId: req.userId, spotifyId: rec.songId } },
+        create: { userId: req.userId, spotifyId: rec.songId },
+        update: {},
+      }),
+      // Remove from liked songs and all playlists — song is no longer wanted
+      prisma.songLike.deleteMany({ where: { userId: req.userId, spotifyId: rec.songId } }),
+      prisma.playlistSong.deleteMany({
+        where: { spotifyId: rec.songId, playlist: { userId: req.userId } },
+      }),
+    ]);
 
     await prisma.recommendation.update({
       where: { id: req.params.id },

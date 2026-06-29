@@ -51,7 +51,7 @@ function renderTemplateWithPills(templateId, vars, openPicker) {
   })
 }
 
-function Bubble({ msg, onLike, justLiked, requestText, friendName }) {
+function Bubble({ msg, onLike, justLiked, requestText, friendName, onReconsider }) {
   const player  = usePlayer()
   const active  = player.isActive(msg.song)
   const playing = active && player.playing
@@ -59,14 +59,12 @@ function Bubble({ msg, onLike, justLiked, requestText, friendName }) {
   const isReply = !!msg.requestId
   const [reaction, setReaction] = useState(msg.dismissed ? 'dismiss' : null)
 
-  const [reconsidered, setReconsidered] = useState(false)
-
   const tagPickerOpen   = justLiked && !!msg.likeId
   const dismissActive   = reaction === 'dismiss'
   const dislikeActive   = reaction === 'dislike'
   const anyReaction     = dismissActive || dislikeActive
   const isPreDiscovered = !isSent && !!msg.preDiscovered
-  const isPriorFeedback = !isSent && !!msg.priorFeedback && !reconsidered
+  const isPriorFeedback = !isSent && !!msg.priorFeedback
 
   async function handleDismiss() {
     try {
@@ -80,14 +78,6 @@ function Bubble({ msg, onLike, justLiked, requestText, friendName }) {
     try {
       if (dislikeActive) { await undislikeRecommendation(msg.id); setReaction(null) }
       else               { await dislikeRecommendation(msg.id);   setReaction('dislike') }
-      window.dispatchEvent(new CustomEvent('jam:like'))
-    } catch (_) {}
-  }
-
-  async function handleReconsider() {
-    try {
-      await reconsiderRecommendation(msg.id)
-      setReconsidered(true)
       window.dispatchEvent(new CustomEvent('jam:like'))
     } catch (_) {}
   }
@@ -184,7 +174,7 @@ function Bubble({ msg, onLike, justLiked, requestText, friendName }) {
             <p className="text-[#535353] text-[9px]">
               {msg.priorFeedback === 'disliked' ? 'Not my vibe' : 'Not for me'}
             </p>
-            <button onClick={handleReconsider}
+            <button onClick={() => onReconsider(msg.id)}
               className="text-[10px] font-medium text-[#1DB954] hover:text-[#1DB954]/80 transition-colors">
               Reconsider
             </button>
@@ -540,6 +530,14 @@ export default function ConversationView({ friend, onBack }) {
     setLiking(null)
   }
 
+  async function handleReconsider(msgId) {
+    try {
+      await reconsiderRecommendation(msgId)
+      setMessages(prev => prev.map(m => m.id === msgId ? { ...m, priorFeedback: null } : m))
+      window.dispatchEvent(new CustomEvent('jam:like'))
+    } catch (_) {}
+  }
+
   async function handleAiSuggest() {
     setSuggesting(true)
     setSuggestError('')
@@ -631,7 +629,8 @@ export default function ConversationView({ friend, onBack }) {
                 : <Bubble key={msg.id} msg={msg} onLike={handleLike}
                     justLiked={justLikedIds.has(msg.id)}
                     requestText={msg.requestId ? requestTextMap[msg.requestId] : null}
-                    friendName={friend.displayName} />
+                    friendName={friend.displayName}
+                    onReconsider={handleReconsider} />
             )}
             <div ref={bottomRef} />
           </>

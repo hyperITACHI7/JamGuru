@@ -3,9 +3,10 @@ import { Heart, Play, Pause, Music, Clock, RefreshCw } from 'lucide-react'
 import TopBar from '../components/layout/TopBar'
 import { getLikedSongs } from '../api/songs'
 import { syncSpotifyLikes } from '../api/auth'
+import { unlikeSong } from '../phase4/api/likes'
 import { usePlayer } from '../context/PlayerContext'
 
-function SongRow({ song, index }) {
+function SongRow({ song, index, onUnlike }) {
   const player  = usePlayer()
   const active  = player.isActive(song)
   const playing = active && player.playing
@@ -50,9 +51,15 @@ function SongRow({ song, index }) {
       {/* Album */}
       <p className="text-[#B3B3B3] text-sm truncate">{song.album}</p>
 
-      {/* Heart */}
+      {/* Unlike / Reconsider */}
       <div className="flex items-center justify-end pr-2">
-        <Heart size={16} className="fill-[#1DB954] text-[#1DB954]" />
+        <button
+          onClick={e => { e.stopPropagation(); onUnlike(song.spotifyId) }}
+          title="Remove from liked songs"
+          className="group/heart text-[#1DB954] hover:text-red-400 transition-colors"
+        >
+          <Heart size={16} className="fill-current group-hover/heart:fill-red-400 transition-colors" />
+        </button>
       </div>
     </div>
   )
@@ -73,6 +80,13 @@ export default function LikedSongs() {
   }
 
   useEffect(() => { fetchSongs() }, [])
+
+  async function handleUnlike(spotifyId) {
+    try {
+      await unlikeSong(spotifyId)
+      setSongs(prev => prev.filter(s => s.spotifyId !== spotifyId))
+    } catch (_) {}
+  }
 
   async function handleSync() {
     setSyncing(true)
@@ -163,7 +177,7 @@ export default function LikedSongs() {
               </div>
 
               {songs.map((song, i) => (
-                <SongRow key={song.spotifyId} song={song} index={i} />
+                <SongRow key={song.spotifyId} song={song} index={i} onUnlike={handleUnlike} />
               ))}
             </>
           )}
