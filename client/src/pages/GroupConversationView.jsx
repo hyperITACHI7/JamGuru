@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, Play, Pause, Heart, Music, Users, ChevronRight, ThumbsDown,
-  Sparkles, Send, X, Plus, Search, ChevronLeft, ListMusic, Reply,
+  Sparkles, Send, X, Plus, Search, ChevronLeft, ListMusic, Reply, RefreshCw,
 } from 'lucide-react'
 import {
   getGroupFeed, likeGroupRec, unlikeGroupRec,
@@ -482,7 +482,7 @@ export default function GroupConversationView({ group, onBack }) {
 
   // ── AI suggest ──────────────────────────────────────────────
   async function handleAiSuggest() {
-    setSuggesting(true); setSuggestError(''); setSuggested(null)
+    setSuggesting(true); setSuggestError('')
     try {
       const { data } = await getGroupAiSuggestion(group.id)
       setSuggested(data)
@@ -927,6 +927,14 @@ export default function GroupConversationView({ group, onBack }) {
                   <Reply size={8} /> reply
                 </span>
               )}
+              <button
+                onClick={handleAiSuggest}
+                disabled={suggesting}
+                title="Try a different song"
+                className="text-[#535353] hover:text-purple-400 transition-colors ml-1 disabled:opacity-40"
+              >
+                <RefreshCw size={14} className={suggesting ? 'animate-spin' : ''} />
+              </button>
               <button onClick={() => { setSuggested(null); setSuggestNote(''); setSuggestError(''); setPendingGroupRequestId(null) }}
                 className="text-[#535353] hover:text-white transition-colors ml-1"><X size={14} /></button>
             </div>

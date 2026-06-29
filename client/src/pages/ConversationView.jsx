@@ -507,7 +507,6 @@ export default function ConversationView({ friend, onBack }) {
   async function handleAiSuggest() {
     setSuggesting(true)
     setSuggestError('')
-    setSuggested(null)
     try {
       const { data } = await getAiSuggestion(friend.id, [...seenSpotifyIds])
       setSuggested(data)
