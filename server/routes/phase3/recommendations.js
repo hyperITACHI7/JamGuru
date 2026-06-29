@@ -44,13 +44,15 @@ router.post('/', auth, async (req, res) => {
     if (!song) return res.status(404).json({ error: 'Song not found — search for it first' });
 
     // Check if the recipient has already discovered or reacted to this song
-    const [alreadyLiked, alreadyInPlaylist, alreadyDisliked, alreadyDismissed] = await Promise.all([
+    const [alreadyLiked, alreadyInPlaylist, alreadyDisliked, alreadyDismissed, alreadyLikedRec] = await Promise.all([
       prisma.songLike.findUnique({ where: { userId_spotifyId: { userId: recipientId, spotifyId: songId } } }),
       prisma.playlistSong.findFirst({ where: { spotifyId: songId, playlist: { userId: recipientId } } }),
       prisma.songDislike.findUnique({ where: { userId_spotifyId: { userId: recipientId, spotifyId: songId } } }),
       prisma.recommendation.findFirst({ where: { recipientId, songId, dismissedAt: { not: null } }, select: { id: true } }),
+      // Belt-and-suspenders: also check if they've liked any prior recommendation of this song
+      prisma.like.findFirst({ where: { likerId: recipientId, recommendation: { songId } }, select: { id: true } }),
     ]);
-    const preDiscovered = !!(alreadyLiked || alreadyInPlaylist);
+    const preDiscovered = !!(alreadyLiked || alreadyInPlaylist || alreadyLikedRec);
     const priorFeedback = alreadyDisliked ? 'disliked' : alreadyDismissed ? 'dismissed' : null;
 
     const rec = await prisma.recommendation.create({

@@ -164,11 +164,11 @@ function Bubble({ msg, onLike, justLiked, requestText, friendName, onReconsider 
               {msg.preDiscovered
                 ? <><Music size={9} /> Already in {friendName}'s library</>
                 : msg.priorFeedback === 'disliked'
-                ? <><ThumbsDown size={9} fill="currentColor" /> Not my vibe</>
+                ? <><ThumbsDown size={9} fill="currentColor" /> Not {friendName}'s vibe</>
                 : msg.priorFeedback === 'dismissed'
-                ? <><X size={9} /> Not for them</>
+                ? <><X size={9} /> Not for {friendName}</>
                 : msg.liked ? <><Heart size={9} fill="currentColor" /> Loved it</>
-                : msg.dismissed ? <><ThumbsDown size={9} /> Not for me</>
+                : msg.dismissed ? <><ThumbsDown size={9} /> Not for {friendName}</>
                 : <><Heart size={9} fill="none" /> Not liked yet</>}
             </span>
             {msg.tags.map(tag => (
@@ -575,6 +575,7 @@ export default function ConversationView({ friend, onBack }) {
       const { data } = await getAiSuggestion(friend.id, [...seenSpotifyIds])
       setSuggested(data)
       setSeenSpotifyIds(prev => new Set([...prev, data.song.spotifyId]))
+      fetchExploredStatus([data.song])
     } catch (e) {
       setSuggestError(e.response?.data?.error || 'AI suggestion failed. Try again.')
     } finally {
