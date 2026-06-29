@@ -334,10 +334,12 @@ export default function Profile() {
         {/* Profile hero */}
         <div className="px-6 pt-4 pb-6 bg-gradient-to-b from-indigo-900/30 to-transparent">
           <div className="flex items-end gap-6">
-            <Avatar user={user} />
-            <div className="pb-1">
+            <div className="flex-shrink-0">
+              <Avatar user={user} />
+            </div>
+            <div className="pb-1 min-w-0">
               <p className="text-[#B3B3B3] text-xs font-bold uppercase tracking-widest mb-1">Profile</p>
-              <h1 className="text-white font-black text-5xl mb-3 leading-none">{user.displayName}</h1>
+              <h1 className="text-white font-black text-4xl sm:text-5xl mb-3 leading-none break-words">{user.displayName}</h1>
               {user.bio && <p className="text-[#B3B3B3] text-sm mb-1">{user.bio}</p>}
               <p className="text-white text-sm">
                 <span className="font-bold">{friendCount}</span>{' '}
@@ -428,6 +430,24 @@ export default function Profile() {
               </button>
             </div>
           )}
+
+          {/* JamGuru badge */}
+          <div>
+            <h2 className="text-white font-bold text-xl mb-4">JamGuru</h2>
+            <div className="flex items-center gap-4 bg-[#181818] hover:bg-[#282828] transition-colors rounded-xl p-4 max-w-sm">
+              <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-[#1DB954] to-emerald-700 flex items-center justify-center flex-shrink-0">
+                <Crown size={24} className="text-black fill-black" />
+              </div>
+              <div>
+                <p className="text-white font-semibold">
+                  JamGuru for{' '}
+                  <span className="text-[#1DB954]">{listenerCount}</span>{' '}
+                  listener{listenerCount !== 1 ? 's' : ''}
+                </p>
+                <p className="text-[#B3B3B3] text-xs mt-0.5">This month's recommendations</p>
+              </div>
+            </div>
+          </div>
 
           {/* Taste profile — display */}
           {hasTaste && !editingTaste && (
@@ -531,24 +551,6 @@ export default function Profile() {
               </button>
             </div>
           )}
-
-          {/* JamGuru badge */}
-          <div>
-            <h2 className="text-white font-bold text-xl mb-4">JamGuru</h2>
-            <div className="flex items-center gap-4 bg-[#181818] hover:bg-[#282828] transition-colors rounded-xl p-4 max-w-sm">
-              <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-[#1DB954] to-emerald-700 flex items-center justify-center flex-shrink-0">
-                <Crown size={24} className="text-black fill-black" />
-              </div>
-              <div>
-                <p className="text-white font-semibold">
-                  JamGuru for{' '}
-                  <span className="text-[#1DB954]">{listenerCount}</span>{' '}
-                  listener{listenerCount !== 1 ? 's' : ''}
-                </p>
-                <p className="text-[#B3B3B3] text-xs mt-0.5">This month's recommendations</p>
-              </div>
-            </div>
-          </div>
 
           {/* Friends & Groups — own profile only */}
           {isOwnProfile && (

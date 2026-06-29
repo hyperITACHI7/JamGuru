@@ -44,24 +44,22 @@ export default function JamGuru() {
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      {/* Gradient header — only show when NOT inside a DM/group chat */}
-      {!selectedEntity && (
-        <div className="relative flex-shrink-0">
-          <div className="absolute inset-0 bg-gradient-to-b from-emerald-900/70 via-[#121212]/60 to-transparent pointer-events-none" />
-          <TopBar
-            transparent
-            rightExtra={
-              <button
-                className="md:hidden w-9 h-9 rounded-full bg-[#282828] hover:bg-[#3e3e3e] flex items-center justify-center transition-colors"
-                onClick={() => setShowMobileMessages(true)}
-                title="Messages"
-              >
-                <MessageCircle size={18} className="text-white" />
-              </button>
-            }
-          />
-        </div>
-      )}
+      {/* Gradient header — always visible on desktop; hidden on mobile when inside a DM/group chat */}
+      <div className={`relative flex-shrink-0 ${selectedEntity ? 'hidden md:block' : ''}`}>
+        <div className="absolute inset-0 bg-gradient-to-b from-emerald-900/70 via-[#121212]/60 to-transparent pointer-events-none" />
+        <TopBar
+          transparent
+          rightExtra={
+            <button
+              className="md:hidden w-9 h-9 rounded-full bg-[#282828] hover:bg-[#3e3e3e] flex items-center justify-center transition-colors"
+              onClick={() => setShowMobileMessages(true)}
+              title="Messages"
+            >
+              <MessageCircle size={18} className="text-white" />
+            </button>
+          }
+        />
+      </div>
 
       {/* Mobile messages — full screen takeover */}
       {showMobileMessages && (
@@ -101,21 +99,23 @@ export default function JamGuru() {
             <div className="h-full overflow-y-auto px-6 pb-8">
 
               {/* Page heading */}
-              <div className="flex items-end gap-6 mb-8 mt-4">
-                <div className="w-28 h-28 rounded-xl bg-gradient-to-br from-[#1DB954] to-emerald-700 flex items-center justify-center shadow-xl shadow-green-900/40 flex-shrink-0">
-                  <Crown size={46} className="text-black fill-black" />
-                </div>
-                <div>
-                  <p className="text-[#B3B3B3] text-xs font-bold uppercase tracking-widest mb-1">Feature</p>
-                  <h1 className="text-white font-black text-3xl mb-2">Discovery Inbox</h1>
-                  <p className="text-[#B3B3B3] text-sm">
-                    Share songs with friends. Get credit when they love it.{' '}
-                    <span className="text-[#1DB954] font-medium">Become their JamGuru.</span>
-                  </p>
-                  <p className="text-[#B3B3B3] text-sm mt-1">
-                    JamGuru for{' '}
-                    <span className="text-white font-semibold">{jamGuruForCount}</span> listeners this month
-                  </p>
+              <div className="mb-8 mt-4">
+                <p className="text-[#B3B3B3] text-xs font-bold uppercase tracking-widest mb-1">Feature</p>
+                <h1 className="text-white font-black text-3xl mb-4">Discovery Inbox</h1>
+                <div className="flex items-center gap-5">
+                  <div className="w-24 h-24 rounded-xl bg-gradient-to-br from-[#1DB954] to-emerald-700 flex items-center justify-center shadow-xl shadow-green-900/40 flex-shrink-0">
+                    <Crown size={40} className="text-black fill-black" />
+                  </div>
+                  <div>
+                    <p className="text-[#B3B3B3] text-sm">
+                      Share songs with friends. Get credit when they love it.{' '}
+                      <span className="text-[#1DB954] font-medium">Become their JamGuru.</span>
+                    </p>
+                    <p className="text-[#B3B3B3] text-sm mt-1">
+                      JamGuru for{' '}
+                      <span className="text-white font-semibold">{jamGuruForCount}</span> listeners this month
+                    </p>
+                  </div>
                 </div>
               </div>
 
