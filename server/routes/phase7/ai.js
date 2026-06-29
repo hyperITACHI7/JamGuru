@@ -104,7 +104,7 @@ router.post('/ai/rank-for-request', auth, async (req, res) => {
 });
 
 // POST /api/ai/suggest/group/:groupId — AI song suggestion for a group
-router.post('/suggest/group/:groupId', auth, async (req, res) => {
+router.post('/ai/suggest/group/:groupId', auth, async (req, res) => {
   try {
     if (!process.env.AI_API_KEY || process.env.AI_API_KEY === 'your-groq-api-key-here') {
       return res.status(503).json({ error: 'AI provider not configured' });
@@ -130,7 +130,7 @@ router.post('/suggest/group/:groupId', auth, async (req, res) => {
 });
 
 // POST /api/ai/rank-for-group-request — rank user's library against a group song request
-router.post('/rank-for-group-request', auth, async (req, res) => {
+router.post('/ai/rank-for-group-request', auth, async (req, res) => {
   try {
     if (!process.env.AI_API_KEY || process.env.AI_API_KEY === 'your-groq-api-key-here') {
       return res.status(503).json({ error: 'AI provider not configured' });
