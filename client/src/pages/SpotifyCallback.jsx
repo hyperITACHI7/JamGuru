@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { syncSpotifyLikes } from '../api/auth'
+import { syncSpotifyLikes, getMe } from '../api/auth'
 
 export default function SpotifyCallback() {
   const [params]   = useSearchParams()
@@ -17,23 +17,24 @@ export default function SpotifyCallback() {
     }
 
     localStorage.setItem('token', token)
-
-    // Decode the JWT payload to get user info (no verification needed client-side)
-    try {
-      const payload = JSON.parse(atob(token.split('.')[1]))
-      localStorage.setItem('user', JSON.stringify({ id: payload.userId }))
-    } catch (_) {}
+    // Temporary stub so auth header works for the getMe call below
+    localStorage.setItem('user', JSON.stringify({}))
 
     setStatus('Syncing your Spotify liked songs…')
 
     syncSpotifyLikes()
       .then(({ data }) => {
         setStatus(`Synced ${data.synced} liked songs!`)
-        setTimeout(() => navigate('/'), 1200)
       })
-      .catch(() => {
-        // Sync failed — still proceed to app, user can retry
-        navigate('/')
+      .catch(() => {})
+      .finally(() => {
+        // Fetch the full user object so onboardingComplete is available
+        getMe()
+          .then(({ data }) => {
+            localStorage.setItem('user', JSON.stringify(data))
+          })
+          .catch(() => {})
+          .finally(() => navigate('/'))
       })
   }, [])  // eslint-disable-line react-hooks/exhaustive-deps
 

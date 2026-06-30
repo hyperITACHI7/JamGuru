@@ -4,6 +4,7 @@ import Sidebar from './Sidebar'
 import NowPlayingBar from './NowPlayingBar'
 import MobileBottomNav from './MobileBottomNav'
 import { usePlayer } from '../../context/PlayerContext'
+import OnboardingModal from '../OnboardingModal'
 
 const API_BASE = import.meta.env.VITE_API_URL ?? ''
 const SSE_EVENTS = ['new_dm_rec', 'new_dm_req', 'new_group_activity']
@@ -63,6 +64,13 @@ export default function SpotifyLayout({ children }) {
   const location = useLocation()
   useSseConnection()
 
+  const [showOnboarding, setShowOnboarding] = useState(() => {
+    try {
+      const user = JSON.parse(localStorage.getItem('user') ?? '{}')
+      return user?.onboardingComplete === false
+    } catch { return false }
+  })
+
   // Mobile layout — no sidebar, bottom nav only on home
   if (isMobile) {
     const isHome = location.pathname === '/'
@@ -73,6 +81,7 @@ export default function SpotifyLayout({ children }) {
         </main>
         {track && <NowPlayingBar />}
         {isHome && <MobileBottomNav />}
+        {showOnboarding && <OnboardingModal onDone={() => setShowOnboarding(false)} />}
       </div>
     )
   }
@@ -87,6 +96,7 @@ export default function SpotifyLayout({ children }) {
         </main>
       </div>
       {track && <NowPlayingBar />}
+      {showOnboarding && <OnboardingModal onDone={() => setShowOnboarding(false)} />}
     </div>
   )
 }

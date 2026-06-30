@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Play, Pause, Music, Sparkles, RefreshCw, Share2, Heart } from 'lucide-react'
 import TopBar from '../components/layout/TopBar'
-import { Link } from 'react-router-dom'
 import { searchSongs, getNewReleases, isSongLiked, likeSong, unlikeSong } from '../api/songs'
 import { usePlayer } from '../context/PlayerContext'
 import { suggestForMe } from '../phase7/api/ai'
@@ -317,21 +316,6 @@ export default function Home() {
             )}
 
             {/* Picked For You */}
-            {hasTaste === false && (
-              <div className="bg-[#181818] rounded-xl p-5 flex items-center justify-between">
-                <div>
-                  <p className="text-white font-semibold text-sm mb-1">Set up your taste profile</p>
-                  <p className="text-[#B3B3B3] text-xs">Get personalised song picks based on what you love.</p>
-                </div>
-                <Link
-                  to="/profile"
-                  className="flex-shrink-0 bg-white text-black text-xs font-bold px-4 py-2 rounded-full hover:scale-105 transition-transform ml-4"
-                >
-                  Set up
-                </Link>
-              </div>
-            )}
-
             {hasTaste && (
               <section>
                 <div className="flex items-center justify-between mb-4">

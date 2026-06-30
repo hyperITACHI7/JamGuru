@@ -20,6 +20,7 @@ const safeUserFields = {
   avatarUrl: true,
   bio: true,
   createdAt: true,
+  onboardingComplete: true,
 };
 
 // POST /api/auth/register
@@ -47,7 +48,7 @@ router.post('/register', async (req, res) => {
 
     const hashedPassword = await bcrypt.hash(password, 10);
     const user = await prisma.user.create({
-      data: { username, displayName, password: hashedPassword },
+      data: { username, displayName, password: hashedPassword, onboardingComplete: false },
       select: safeUserFields,
     });
 
@@ -92,6 +93,21 @@ router.get('/me', authMiddleware, async (req, res) => {
     });
     if (!user) return res.status(404).json({ error: 'User not found' });
     res.json(user);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// PATCH /api/auth/complete-onboarding
+router.patch('/complete-onboarding', authMiddleware, async (req, res) => {
+  try {
+    const user = await prisma.user.update({
+      where:  { id: req.userId },
+      data:   { onboardingComplete: true },
+      select: safeUserFields,
+    });
+    res.json({ user });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });

@@ -68,6 +68,7 @@ router.get('/callback', async (req, res) => {
           spotifyUserId:       profile.id,
           spotifyAccessToken:  tokens.access_token,
           spotifyRefreshToken: tokens.refresh_token,
+          onboardingComplete:  false,
         },
       });
     } else {

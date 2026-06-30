@@ -25,7 +25,8 @@ model User {
   tasteArtists     String[]  @default([]) @map("taste_artists")
   tasteEras        String[]  @default([]) @map("taste_eras")
   tastePinned      Json      @default("{}") @map("taste_pinned")
-  tasteUpdatedAt   DateTime? @map("taste_updated_at")
+  tasteUpdatedAt      DateTime? @map("taste_updated_at")
+  onboardingComplete  Boolean   @default(true) @map("onboarding_complete")
 
   sentFriendRequests      Friendship[]           @relation("FriendshipRequester")
   receivedFriendRequests  Friendship[]           @relation("FriendshipAddressee")
