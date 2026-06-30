@@ -87,8 +87,8 @@ function StepWelcome({ onNext }) {
 // ── Step 2: How It Works ─────────────────────────────────────────────────────
 function StepHowItWorks({ onNext }) {
   const rows = [
-    { icon: Share2, label: 'Friends send you songs with context', sub: 'A quick note about why they think you'll love it' },
-    { icon: Heart,  label: 'Like what lands, pass on what doesn't', sub: 'Your reactions shape your taste profile over time' },
+    { icon: Share2, label: 'Friends send you songs with context', sub: "A quick note about why they think you'll love it" },
+    { icon: Heart,  label: "Like what lands, pass on what doesn't", sub: 'Your reactions shape your taste profile over time' },
     { icon: Crown,  label: 'Top recommender earns the JamGuru title', sub: 'The friend who knows your taste best, recognised monthly' },
   ]
 
