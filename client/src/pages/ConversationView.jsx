@@ -190,7 +190,13 @@ function Bubble({ msg, onLike, justLiked, requestText, friendName, onReconsider 
         )}
 
         {!isSent && !isPriorFeedback && isPreDiscovered && (
-          <p className="text-[#535353] text-[9px] mt-1.5">Already in your library</p>
+          <div className="mt-1.5 flex items-center justify-between">
+            <p className="text-[#535353] text-[9px]">Already in your library</p>
+            <button onClick={() => onReconsider(msg.id)}
+              className="text-[10px] font-medium text-[#1DB954] hover:text-[#1DB954]/80 transition-colors">
+              Reconsider
+            </button>
+          </div>
         )}
 
         {!isSent && !isPriorFeedback && !isPreDiscovered && (
@@ -563,7 +569,7 @@ export default function ConversationView({ friend, onBack }) {
   async function handleReconsider(msgId) {
     try {
       await reconsiderRecommendation(msgId)
-      setMessages(prev => prev.map(m => m.id === msgId ? { ...m, priorFeedback: null } : m))
+      setMessages(prev => prev.map(m => m.id === msgId ? { ...m, priorFeedback: null, preDiscovered: null } : m))
       window.dispatchEvent(new CustomEvent('jam:like'))
     } catch (_) {}
   }

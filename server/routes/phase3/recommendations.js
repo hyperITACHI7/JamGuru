@@ -318,7 +318,7 @@ router.patch('/:id/reconsider', auth, async (req, res) => {
     if (rec.recipientId !== req.userId) return res.status(403).json({ error: 'Forbidden' });
     await prisma.recommendation.update({
       where: { id: req.params.id },
-      data:  { priorFeedback: null },
+      data:  { priorFeedback: null, preDiscovered: null },
     });
     res.json({ ok: true });
   } catch (e) {
