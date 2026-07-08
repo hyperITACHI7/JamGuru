@@ -2,6 +2,19 @@
 @tailwind components;
 @tailwind utilities;
 
+html, body {
+  height: 100%;
+  /* The app is a single fixed-height SPA shell with its own internal scroll
+     containers. Without this, focusing an input near the bottom of a fixed
+     overlay (e.g. the friends/groups search bar) makes mobile browsers
+     scroll the *document* to keep it above the virtual keyboard, which
+     visually detaches the fixed overlay's content from the viewport until
+     the user manually scrolls back up. Locking the document itself keeps
+     all scrolling contained to the elements that declare overflow-y-auto. */
+  overflow: hidden;
+  overscroll-behavior-y: none;
+}
+
 body {
   background-color: #121212;
   color: #ffffff;
