@@ -106,7 +106,7 @@ export default function JamGuru() {
             </button>
             <span className="text-white font-bold text-base">Messages</span>
           </div>
-          <div className="flex-1 overflow-hidden">
+          <div className="flex-1 overflow-hidden flex min-h-0">
             <FriendsDmPanel
               selected={selectedEntity}
               onSelect={(e) => { setSelectedEntity(e); setShowMobileMessages(false) }}
