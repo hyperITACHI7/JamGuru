@@ -83,13 +83,15 @@ export default function JamGuru() {
         <div className="absolute inset-0 bg-gradient-to-b from-emerald-900/70 via-[#121212]/60 to-transparent pointer-events-none" />
         <TopBar
           transparent
+          hideBellOnMobile
+          hideProfileOnMobile
           rightExtra={
             <button
-              className="md:hidden w-9 h-9 rounded-full bg-[#282828] hover:bg-[#3e3e3e] flex items-center justify-center transition-colors"
+              className="md:hidden w-12 h-12 rounded-full bg-[#282828] hover:bg-[#3e3e3e] flex items-center justify-center transition-colors"
               onClick={() => setShowMobileMessages(true)}
               title="Messages"
             >
-              <MessageCircle size={18} className="text-white" />
+              <MessageCircle size={24} className="text-white" />
             </button>
           }
         />

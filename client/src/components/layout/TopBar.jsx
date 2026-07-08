@@ -19,7 +19,7 @@ function getParentRoute(pathname) {
   return '/'
 }
 
-export default function TopBar({ transparent = false, rightExtra = null }) {
+export default function TopBar({ transparent = false, rightExtra = null, hideBellOnMobile = false, hideProfileOnMobile = false }) {
   const navigate = useNavigate()
   const location = useLocation()
   const user = JSON.parse(localStorage.getItem('user') || '{}')
@@ -59,7 +59,7 @@ export default function TopBar({ transparent = false, rightExtra = null }) {
               permission === 'denied' ? 'Enable notifications in browser settings' :
               subscribed ? 'Disable notifications' : 'Enable notifications'
             }
-            className="w-8 h-8 rounded-full bg-[#282828] flex items-center justify-center hover:bg-[#3e3e3e] transition-colors"
+            className={`${hideBellOnMobile ? 'hidden md:flex' : 'flex'} w-8 h-8 rounded-full bg-[#282828] items-center justify-center hover:bg-[#3e3e3e] transition-colors`}
           >
             {subscribed
               ? <Bell size={16} className="text-[#1DB954]" />
@@ -71,7 +71,7 @@ export default function TopBar({ transparent = false, rightExtra = null }) {
         {/* Profile — avatar + first name on mobile, full name pill on desktop */}
         <button
           onClick={() => navigate('/profile')}
-          className="flex items-center gap-2 bg-[#282828] hover:bg-[#3E3E3E] rounded-full pl-1 pr-3 py-1 transition-colors"
+          className={`${hideProfileOnMobile ? 'hidden md:flex' : 'flex'} items-center gap-2 bg-[#282828] hover:bg-[#3E3E3E] rounded-full pl-1 pr-3 py-1 transition-colors`}
         >
           <div className="w-7 h-7 rounded-full bg-[#535353] flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
             {user.displayName?.[0]?.toUpperCase() ?? <User size={14} />}

@@ -179,7 +179,7 @@ export default function FriendsDmPanel({ selected, onSelect, className = '' }) {
     <div className={`w-[240px] flex-shrink-0 min-h-0 border-l border-white/10 shadow-[-6px_0_16px_-10px_rgba(0,0,0,0.7)] flex flex-col overflow-hidden ${className}`}>
 
       {/* Tab switcher */}
-      <div className="px-3 pt-3 pb-0 flex-shrink-0">
+      <div className="px-3 pt-3 pb-3 flex-shrink-0 border-b border-white/5">
         <div className="flex bg-[#1a1a1a] rounded-full p-0.5">
           <button
             onClick={() => switchTab('friends')}
@@ -202,10 +202,11 @@ export default function FriendsDmPanel({ selected, onSelect, className = '' }) {
         </div>
       </div>
 
-      {/* Sort toggle — friends tab only. Labeled and set apart from the tab switcher above so it
-          reads as a sub-control of "Friends", not a sibling of the Friends/Groups switch. */}
+      {/* Sort toggle — friends tab only. The divider now sits above it (between the tab switcher
+          and this block) instead of below, so it reads as grouped with the friends list beneath
+          it rather than separated from it. */}
       {tab === 'friends' && friends.length > 0 && (
-        <div className="px-3 pt-4 pb-2 flex-shrink-0 border-b border-white/5">
+        <div className="px-3 pt-3 pb-2 flex-shrink-0">
           <p className="text-[9px] font-bold uppercase tracking-widest text-[#535353] mb-1.5 px-0.5">
             Sort friends by
           </p>
