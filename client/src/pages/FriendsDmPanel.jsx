@@ -202,9 +202,13 @@ export default function FriendsDmPanel({ selected, onSelect, className = '' }) {
         </div>
       </div>
 
-      {/* Sort toggle — friends tab only */}
+      {/* Sort toggle — friends tab only. Labeled and set apart from the tab switcher above so it
+          reads as a sub-control of "Friends", not a sibling of the Friends/Groups switch. */}
       {tab === 'friends' && friends.length > 0 && (
-        <div className="px-3 pt-2 pb-2 flex-shrink-0 border-b border-white/5">
+        <div className="px-3 pt-4 pb-2 flex-shrink-0 border-b border-white/5">
+          <p className="text-[9px] font-bold uppercase tracking-widest text-[#535353] mb-1.5 px-0.5">
+            Sort friends by
+          </p>
           <div className="flex bg-[#1a1a1a] rounded-full p-0.5">
             {[['latest', 'Latest'], ['score', 'By Score']].map(([val, label]) => (
               <button key={val} onClick={() => setSort(val)}
