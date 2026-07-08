@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { NavLink, useNavigate } from 'react-router-dom'
+import { NavLink } from 'react-router-dom'
 import { Home, Search, Library, Plus, ChevronLeft, Heart, Crown, Music } from 'lucide-react'
 import api from '../../api/axios'
 import { getPlaylists } from '../../api/auth'
@@ -15,7 +15,6 @@ function SpotifyCircle() {
 export default function Sidebar({ collapsed, setCollapsed }) {
   const [pendingCount, setPendingCount] = useState(0)
   const [playlists, setPlaylists] = useState([])
-  const navigate = useNavigate()
 
   useEffect(() => {
     getPlaylists().then(({ data }) => setPlaylists(data.playlists || [])).catch(() => {})
@@ -123,7 +122,7 @@ export default function Sidebar({ collapsed, setCollapsed }) {
 
           {!collapsed && (
             <div className="flex items-center gap-1">
-              <button onClick={() => navigate('/import-playlist')} className="text-[#B3B3B3] hover:text-white hover:bg-[#1A1A1A] p-2 rounded-full transition-colors" title="Import Spotify playlist">
+              <button onClick={() => window.dispatchEvent(new CustomEvent('jam:open-import'))} className="text-[#B3B3B3] hover:text-white hover:bg-[#1A1A1A] p-2 rounded-full transition-colors" title="Import Spotify playlist">
                 <Plus size={16} />
               </button>
               <button
@@ -198,7 +197,7 @@ export default function Sidebar({ collapsed, setCollapsed }) {
 
           {!collapsed && (
             <button
-              onClick={() => navigate('/import-playlist')}
+              onClick={() => window.dispatchEvent(new CustomEvent('jam:open-import'))}
               className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-[#1A1A1A] transition-colors w-full text-left"
             >
               <div className="w-10 h-10 flex-shrink-0 rounded bg-[#282828] flex items-center justify-center">

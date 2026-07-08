@@ -326,13 +326,14 @@ export default function Profile() {
     <div className="flex flex-col h-full overflow-hidden">
       {/* Gradient header */}
       <div className="relative flex-shrink-0">
-        <div className="absolute inset-0 bg-gradient-to-b from-indigo-900/60 via-[#121212]/50 to-transparent pointer-events-none" />
+        <div className="absolute inset-x-0 top-0 h-[320px] bg-gradient-to-b from-indigo-900/60 via-[#121212]/50 to-transparent pointer-events-none" />
         <TopBar transparent showNav={false} />
       </div>
 
-      <div className="flex-1 overflow-y-auto">
-        {/* Profile hero */}
-        <div className="px-6 pt-4 pb-6 bg-gradient-to-b from-indigo-900/30 to-transparent">
+      <div className="flex-1 overflow-y-auto relative z-10">
+        {/* Profile hero — sits on top of the header's gradient (extended down via the div
+            above), so the color fade reads as one continuous wash, not a restarted one. */}
+        <div className="px-6 pt-4 pb-6">
           <div className="flex items-end gap-6">
             <div className="flex-shrink-0">
               <Avatar user={user} />
@@ -363,12 +364,6 @@ export default function Profile() {
                   className="border border-[#878787] hover:border-white text-white text-sm font-semibold px-6 py-1.5 rounded-full transition-colors"
                 >
                   {editing ? 'Cancel' : 'Edit profile'}
-                </button>
-                <button
-                  onClick={() => { setEditingTaste(v => !v); setEditing(false) }}
-                  className="border border-[#878787] hover:border-white text-white text-sm font-semibold px-6 py-1.5 rounded-full transition-colors"
-                >
-                  {editingTaste ? 'Cancel' : 'Edit taste'}
                 </button>
                 <button
                   onClick={handleLogout}
@@ -452,12 +447,22 @@ export default function Profile() {
           {/* Taste profile — display */}
           {hasTaste && !editingTaste && (
             <div>
-              <div className="flex items-center gap-3 mb-3">
-                <h2 className="text-white font-bold text-xl">Taste Profile</h2>
-                {taste.updatedAt && (
-                  <span className="text-[#535353] text-xs">
-                    Updated {new Date(taste.updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                  </span>
+              <div className="flex items-center justify-between gap-3 mb-3">
+                <div className="flex items-center gap-3">
+                  <h2 className="text-white font-bold text-xl">Taste Profile</h2>
+                  {taste.updatedAt && (
+                    <span className="text-[#535353] text-xs">
+                      Updated {new Date(taste.updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    </span>
+                  )}
+                </div>
+                {isOwnProfile && (
+                  <button
+                    onClick={() => { setEditingTaste(true); setEditing(false) }}
+                    className="border border-[#878787] hover:border-white text-white text-xs font-semibold px-4 py-1 rounded-full transition-colors flex-shrink-0"
+                  >
+                    Edit taste
+                  </button>
                 )}
               </div>
               <div className="bg-[#181818] rounded-xl p-4 space-y-3">
@@ -478,14 +483,22 @@ export default function Profile() {
               <p className="text-[#B3B3B3] text-sm mb-3">
                 No taste profile yet. Sync your Spotify liked songs or set it manually.
               </p>
-              <button
-                onClick={handleTasteRefresh}
-                disabled={refreshingTaste}
-                className="flex items-center gap-2 text-[#1DB954] text-sm font-semibold hover:underline disabled:opacity-50"
-              >
-                <RefreshCw size={13} className={refreshingTaste ? 'animate-spin' : ''} />
-                {refreshingTaste ? 'Analysing…' : 'Generate with AI'}
-              </button>
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={handleTasteRefresh}
+                  disabled={refreshingTaste}
+                  className="flex items-center gap-2 text-[#1DB954] text-sm font-semibold hover:underline disabled:opacity-50"
+                >
+                  <RefreshCw size={13} className={refreshingTaste ? 'animate-spin' : ''} />
+                  {refreshingTaste ? 'Analysing…' : 'Generate with AI'}
+                </button>
+                <button
+                  onClick={() => { setEditingTaste(true); setEditing(false) }}
+                  className="text-[#B3B3B3] text-sm font-semibold hover:text-white hover:underline"
+                >
+                  Set manually
+                </button>
+              </div>
             </div>
           )}
 
@@ -494,14 +507,22 @@ export default function Profile() {
             <div className="bg-[#282828] rounded-xl p-5 space-y-5 max-w-lg">
               <div className="flex items-center justify-between">
                 <h2 className="text-white font-bold">Edit taste profile</h2>
-                <button
-                  onClick={handleTasteRefresh}
-                  disabled={refreshingTaste}
-                  className="flex items-center gap-1.5 text-[#1DB954] text-xs font-semibold hover:underline disabled:opacity-50"
-                >
-                  <RefreshCw size={11} className={refreshingTaste ? 'animate-spin' : ''} />
-                  {refreshingTaste ? 'Analysing…' : 'Refresh with AI'}
-                </button>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={handleTasteRefresh}
+                    disabled={refreshingTaste}
+                    className="flex items-center gap-1.5 text-[#1DB954] text-xs font-semibold hover:underline disabled:opacity-50"
+                  >
+                    <RefreshCw size={11} className={refreshingTaste ? 'animate-spin' : ''} />
+                    {refreshingTaste ? 'Analysing…' : 'Refresh with AI'}
+                  </button>
+                  <button
+                    onClick={() => setEditingTaste(false)}
+                    className="text-[#B3B3B3] text-xs font-semibold hover:text-white transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
               </div>
 
               <div className="space-y-2">

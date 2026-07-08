@@ -105,13 +105,14 @@ export default function LikedSongs() {
   return (
     <div className="flex flex-col h-full overflow-hidden">
       <div className="relative flex-shrink-0">
-        <div className="absolute inset-0 bg-gradient-to-b from-indigo-900/80 via-[#121212]/60 to-transparent pointer-events-none" />
+        <div className="absolute inset-x-0 top-0 h-[400px] bg-gradient-to-b from-indigo-900/80 via-[#121212]/60 to-transparent pointer-events-none" />
         <TopBar transparent />
       </div>
 
-      <div className="flex-1 overflow-y-auto">
-        {/* Hero */}
-        <div className="px-6 pb-6 bg-gradient-to-b from-indigo-900/60 to-transparent">
+      <div className="flex-1 overflow-y-auto relative z-10">
+        {/* Hero — sits on top of the header's gradient (extended down via the div above), so
+            the color fade reads as one continuous wash instead of restarting a second time. */}
+        <div className="px-6 pb-6">
           <div className="flex items-end gap-6 pt-2 pb-4">
             <div className="w-48 h-48 flex-shrink-0 rounded-md bg-gradient-to-br from-indigo-500 to-violet-800 flex items-center justify-center shadow-2xl">
               <Heart size={64} className="fill-white text-white" />

@@ -2,7 +2,9 @@ import { useState } from 'react'
 import { X, Check, Loader, Music } from 'lucide-react'
 import { importPlaylist } from '../api/auth'
 
-export default function ImportPlaylistModal({ onClose, onImported }) {
+// Desktop: rendered as a half-width panel inside SpotifyLayout's <main>, with a dimmed,
+// click-to-close backdrop over the other half. Fills its container (h-full).
+export default function ImportPlaylistPanel({ onClose, onImported }) {
   const [url, setUrl]         = useState('')
   const [status, setStatus]   = useState('idle')  // idle | loading | success | error
   const [result, setResult]   = useState(null)
@@ -17,7 +19,7 @@ export default function ImportPlaylistModal({ onClose, onImported }) {
       const { data } = await importPlaylist(trimmed)
       setResult(data)
       setStatus('success')
-      onImported?.()
+      onImported?.(data)
     } catch (e) {
       setErrMsg(e.response?.data?.error || 'Could not import playlist. Check the URL and try again.')
       setStatus('error')
@@ -29,24 +31,19 @@ export default function ImportPlaylistModal({ onClose, onImported }) {
   }
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/70"
-      onClick={e => e.target === e.currentTarget && onClose()}
-    >
-      <div className="relative z-10 w-full md:w-[420px] bg-[#181818] rounded-t-2xl md:rounded-2xl shadow-2xl p-6">
-        <div className="md:hidden w-10 h-1 bg-white/20 rounded-full mx-auto -mt-2 mb-4" />
-
-        {/* Header */}
-        <div className="flex items-center justify-between mb-5">
-          <div>
-            <h2 className="text-white font-bold text-lg">Import Spotify Playlist</h2>
-            <p className="text-[#B3B3B3] text-xs mt-0.5">Paste any public playlist link</p>
-          </div>
-          <button onClick={onClose} className="text-[#B3B3B3] hover:text-white transition-colors p-1">
-            <X size={20} />
-          </button>
+    <div className="h-full flex flex-col bg-[#181818]">
+      {/* Header */}
+      <div className="flex items-center justify-between px-6 pt-6 pb-5 flex-shrink-0">
+        <div>
+          <h2 className="text-white font-bold text-lg">Import Spotify Playlist</h2>
+          <p className="text-[#B3B3B3] text-xs mt-0.5">Paste any public playlist link</p>
         </div>
+        <button onClick={onClose} className="text-[#B3B3B3] hover:text-white transition-colors p-1">
+          <X size={20} />
+        </button>
+      </div>
 
+      <div className="flex-1 overflow-y-auto px-6 pb-6">
         {/* Success state */}
         {status === 'success' && result && (
           <div className="text-center py-6">

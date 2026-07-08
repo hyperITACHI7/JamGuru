@@ -5,6 +5,7 @@ import NowPlayingBar from './NowPlayingBar'
 import MobileBottomNav from './MobileBottomNav'
 import { usePlayer } from '../../context/PlayerContext'
 import OnboardingModal from '../OnboardingModal'
+import ImportPlaylistPanel from '../ImportPlaylistPanel'
 
 const API_BASE = import.meta.env.VITE_API_URL ?? ''
 const SSE_EVENTS = ['new_dm_rec', 'new_dm_req', 'new_group_activity', 'dm_reaction']
@@ -71,6 +72,15 @@ export default function SpotifyLayout({ children }) {
     } catch { return false }
   })
 
+  // Desktop-only: Import Playlist opens as a half-width panel over the current page
+  // instead of navigating away — mobile keeps the full-page /import-playlist route.
+  const [showImportPanel, setShowImportPanel] = useState(false)
+  useEffect(() => {
+    function handler() { setShowImportPanel(true) }
+    window.addEventListener('jam:open-import', handler)
+    return () => window.removeEventListener('jam:open-import', handler)
+  }, [])
+
   // Mobile layout — no sidebar, bottom nav only on home
   if (isMobile) {
     const isHome = location.pathname === '/'
@@ -91,8 +101,20 @@ export default function SpotifyLayout({ children }) {
     <div className="h-screen flex flex-col bg-black overflow-hidden">
       <div className={`flex gap-2 p-2 min-h-0 ${track ? 'flex-1 pb-0' : 'flex-1 pb-2'}`}>
         <Sidebar collapsed={collapsed} setCollapsed={setCollapsed} />
-        <main className="flex-1 bg-[#121212] rounded-xl overflow-hidden flex flex-col min-h-0">
+        <main className="flex-1 bg-[#121212] rounded-xl overflow-hidden flex flex-col min-h-0 relative">
           {children}
+          {showImportPanel && (
+            <div className="absolute inset-0 z-40 flex">
+              <div className="w-1/2 h-full shadow-2xl flex-shrink-0">
+                <ImportPlaylistPanel onClose={() => setShowImportPanel(false)} />
+              </div>
+              <div
+                className="flex-1 h-full bg-black/60 cursor-pointer"
+                onClick={() => setShowImportPanel(false)}
+                title="Close"
+              />
+            </div>
+          )}
         </main>
       </div>
       {track && <NowPlayingBar />}

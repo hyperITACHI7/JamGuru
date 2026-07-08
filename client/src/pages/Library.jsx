@@ -4,6 +4,15 @@ import { Link } from 'react-router-dom'
 import TopBar from '../components/layout/TopBar'
 import { getPlaylists } from '../api/auth'
 
+// Desktop: Import Playlist opens as a half-width panel over the current page instead of
+// navigating away. Mobile keeps the normal full-page /import-playlist navigation.
+function handleImportClick(e) {
+  if (window.matchMedia('(min-width: 768px)').matches) {
+    e.preventDefault()
+    window.dispatchEvent(new CustomEvent('jam:open-import'))
+  }
+}
+
 export default function Library() {
   const [playlists, setPlaylists] = useState([])
 
@@ -40,6 +49,7 @@ export default function Library() {
             <h2 className="text-white font-bold text-lg">Playlists</h2>
             <Link
               to="/import-playlist"
+              onClick={handleImportClick}
               className="w-8 h-8 rounded-full bg-[#282828] hover:bg-[#3e3e3e] flex items-center justify-center transition-colors"
               title="Import Spotify playlist"
             >
@@ -50,6 +60,7 @@ export default function Library() {
           {playlists.length === 0 ? (
             <Link
               to="/import-playlist"
+              onClick={handleImportClick}
               className="flex items-center gap-4 p-3 rounded-lg hover:bg-[#ffffff0d] transition-colors"
             >
               <div className="w-16 h-16 flex-shrink-0 rounded-md bg-[#282828] flex items-center justify-center shadow-lg">
@@ -82,6 +93,7 @@ export default function Library() {
 
               <Link
                 to="/import-playlist"
+                onClick={handleImportClick}
                 className="flex items-center gap-3 p-3 rounded-lg hover:bg-[#ffffff0d] transition-colors mt-2"
               >
                 <div className="w-16 h-16 flex-shrink-0 rounded-md bg-[#282828] flex items-center justify-center">
