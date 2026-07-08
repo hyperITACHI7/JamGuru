@@ -9,6 +9,7 @@ import ConversationView from './ConversationView'
 import GroupConversationView from './GroupConversationView'
 import { getInbox } from '../phase3/api/recommendations'
 import { getJamGuruCount } from '../phase4/api/jamguru'
+import { useVisualViewport } from '../hooks/useVisualViewport'
 
 function groupByTime(recs) {
   const now   = new Date()
@@ -54,6 +55,7 @@ export default function JamGuru() {
   const [jamGuruForCount, setJamGuruForCount] = useState(0)
   // selectedEntity: null | { type: 'friend'|'group', data: {...} }
   const [selectedEntity, setSelectedEntity]   = useState(null)
+  const visualViewport = useVisualViewport()
 
   const fetchJamGuruCount = useCallback(() => {
     getJamGuruCount()
@@ -97,9 +99,14 @@ export default function JamGuru() {
         />
       </div>
 
-      {/* Mobile messages — full screen takeover */}
+      {/* Mobile messages — full screen takeover. Anchored to the visual viewport (not raw
+          inset-0) so it doesn't appear to jump off-screen when the keyboard opens — see
+          useVisualViewport for why. */}
       {showMobileMessages && (
-        <div className="md:hidden fixed inset-0 z-50 bg-[#121212] flex flex-col">
+        <div
+          className="md:hidden fixed inset-x-0 z-50 bg-[#121212] flex flex-col"
+          style={visualViewport ? { top: visualViewport.offsetTop, height: visualViewport.height } : { top: 0, height: '100dvh' }}
+        >
           <div className="flex items-center gap-3 px-4 py-3 border-b border-white/10 flex-shrink-0">
             <button onClick={() => setShowMobileMessages(false)} className="text-[#B3B3B3] hover:text-white transition-colors">
               <X size={22} />
