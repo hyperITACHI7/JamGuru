@@ -290,7 +290,7 @@ export default function FriendsDmPanel({ selected, onSelect, className = '' }) {
             value={query}
             onChange={e => setQuery(e.target.value)}
             placeholder={tab === 'friends' ? 'Search friends' : 'Search groups'}
-            className="w-full bg-[#1a1a1a] text-white text-base md:text-xs rounded-full pl-8 pr-8 py-2.5 md:py-1.5 focus:outline-none focus:ring-1 focus:ring-[#1DB954]/50 placeholder-[#535353]"
+            className="w-full bg-[#1a1a1a] text-white text-base md:text-sm rounded-full pl-8 pr-8 py-2.5 md:py-2 focus:outline-none focus:ring-1 focus:ring-[#1DB954]/50 placeholder-[#535353]"
           />
           {query && (
             <button
