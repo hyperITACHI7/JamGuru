@@ -441,6 +441,12 @@ router.post('/:id/recommendations/:recId/like', auth, async (req, res) => {
     // Update group score only — no personal trust ranking changes
     await recomputeGroupScore(prisma, { groupId: req.params.id, recommendationId: req.params.recId });
 
+    const otherMembers = await prisma.groupMember.findMany({
+      where: { groupId: req.params.id, userId: { not: req.userId } },
+      select: { userId: true },
+    });
+    notifyMany(otherMembers.map(m => m.userId), 'new_group_activity', { groupId: req.params.id });
+
     const likeCount = await prisma.like.count({ where: { recommendationId: req.params.recId } });
     res.json({ liked: true, likeCount, likeId: like.id });
   } catch (e) {
@@ -464,6 +470,12 @@ router.delete('/:id/recommendations/:recId/like', auth, async (req, res) => {
 
     await prisma.like.delete({ where: { id: like.id } });
     await recomputeGroupScore(prisma, { groupId: req.params.id, recommendationId: req.params.recId });
+
+    const otherMembers = await prisma.groupMember.findMany({
+      where: { groupId: req.params.id, userId: { not: req.userId } },
+      select: { userId: true },
+    });
+    notifyMany(otherMembers.map(m => m.userId), 'new_group_activity', { groupId: req.params.id });
 
     const likeCount = await prisma.like.count({ where: { recommendationId: req.params.recId } });
     res.json({ liked: false, likeCount });

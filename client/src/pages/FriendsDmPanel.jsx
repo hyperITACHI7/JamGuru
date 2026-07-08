@@ -273,17 +273,16 @@ export default function FriendsDmPanel({ selected, onSelect, className = '' }) {
         )}
       </div>
 
-      {/* Search — pinned to the bottom of the panel, always visible without scrolling. No bar-style
-          background here on purpose, so it reads as part of the sidebar rather than a strip that
-          matches the DM composer bar sitting next to it. */}
-      <div className="flex-shrink-0 border-t border-white/10 px-3 py-2.5">
+      {/* Search — floating pill, no wrapper bar/background/border of its own, pinned to the
+          bottom of the panel (last flex item) so it's always visible without scrolling. */}
+      <div className="flex-shrink-0 px-2.5 py-2">
         <div className="relative">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#535353] pointer-events-none" />
+          <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#535353] pointer-events-none" />
           <input
             value={query}
             onChange={e => setQuery(e.target.value)}
             placeholder={tab === 'friends' ? 'Search friends' : 'Search groups'}
-            className="w-full bg-[#1a1a1a] text-white text-xs rounded-full pl-8 pr-8 py-2 focus:outline-none focus:ring-1 focus:ring-[#1DB954]/50 placeholder-[#535353]"
+            className="w-full bg-[#1a1a1a] text-white text-xs rounded-full pl-8 pr-8 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#1DB954]/50 placeholder-[#535353]"
           />
           {query && (
             <button

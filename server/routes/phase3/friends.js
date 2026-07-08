@@ -35,9 +35,10 @@ router.get('/inbox-summary', auth, async (req, res) => {
   const me = req.userId;
   try {
     const [dmNewRecs, dmOpenReqs, groupNewRecs, groupOpenReqs, dmRecActivity, dmReqActivity, groupRecActivity, groupReqActivity] = await Promise.all([
-      // DM recs from friends not yet liked or dismissed
+      // DM recs from friends not yet liked, dismissed, or even seen (opening the conversation
+      // clears this even without a reaction — see /conversation/:friendId)
       prisma.recommendation.findMany({
-        where: { recipientId: me, groupId: null, dismissedAt: null, likes: { none: { likerId: me } } },
+        where: { recipientId: me, groupId: null, dismissedAt: null, seenAt: null, likes: { none: { likerId: me } } },
         select: { senderId: true },
       }),
       // DM song requests I received that are still open

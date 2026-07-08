@@ -7,7 +7,7 @@ import { usePlayer } from '../../context/PlayerContext'
 import OnboardingModal from '../OnboardingModal'
 
 const API_BASE = import.meta.env.VITE_API_URL ?? ''
-const SSE_EVENTS = ['new_dm_rec', 'new_dm_req', 'new_group_activity']
+const SSE_EVENTS = ['new_dm_rec', 'new_dm_req', 'new_group_activity', 'dm_reaction']
 
 function useSseConnection() {
   const esRef = useRef(null)

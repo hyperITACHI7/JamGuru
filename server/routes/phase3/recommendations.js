@@ -255,6 +255,17 @@ router.get('/conversation/:friendId', auth, async (req, res) => {
     ].sort((a, b) => new Date(a.sentAt) - new Date(b.sentAt));
 
     res.json(messages);
+
+    // Mark the friend's recs as seen now that I've opened this conversation, so the
+    // sidebar glow stops even if I don't like/dismiss them. Fire-and-forget — the
+    // response is already sent.
+    const unseenIds = received.filter(r => !r.seenAt).map(r => r.id);
+    if (unseenIds.length > 0) {
+      prisma.recommendation.updateMany({
+        where: { id: { in: unseenIds } },
+        data: { seenAt: new Date() },
+      }).catch(() => {});
+    }
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'Server error' });

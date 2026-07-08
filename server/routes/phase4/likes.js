@@ -4,6 +4,7 @@ const auth = require('../../middleware/auth');
 const { recomputeScores, FEEDBACK_TAGS } = require('../../services/phase4/scoring');
 const { pushNotify } = require('../../services/pushNotifier');
 const { refreshTasteProfile } = require('../../services/tasteProfile');
+const { notify } = require('../../sse');
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -44,6 +45,8 @@ router.post('/recommendations/:id/like', auth, async (req, res) => {
         url: '/jamguru',
       })).catch(() => {})
 
+    notify(rec.senderId, 'dm_reaction', { fromFriendId: req.userId });
+
     const likeCount = await prisma.like.count({ where: { recommendationId: req.params.id } });
     res.json({ liked: true, likeCount, likeId: like.id });
   } catch (e) {
@@ -57,11 +60,14 @@ router.delete('/recommendations/:id/like', auth, async (req, res) => {
   try {
     const like = await prisma.like.findFirst({
       where: { recommendationId: req.params.id, likerId: req.userId },
+      include: { recommendation: { select: { senderId: true } } },
     });
     if (!like) return res.status(404).json({ error: 'Like not found' });
 
     await prisma.like.delete({ where: { id: like.id } });
     await recomputeScores(prisma, { recommendationId: req.params.id, likerId: req.userId });
+
+    notify(like.recommendation.senderId, 'dm_reaction', { fromFriendId: req.userId });
 
     const likeCount = await prisma.like.count({ where: { recommendationId: req.params.id } });
     res.json({ liked: false, likeCount });
@@ -187,6 +193,8 @@ router.post('/recommendations/:id/dismiss', auth, async (req, res) => {
       data: { dismissedAt: new Date(), dismissedById: req.userId },
     });
 
+    notify(rec.senderId, 'dm_reaction', { fromFriendId: req.userId });
+
     res.json({ dismissed: true });
   } catch (e) {
     console.error(e);
@@ -220,6 +228,7 @@ router.post('/recommendations/:id/dislike', auth, async (req, res) => {
     });
 
     refreshTasteProfile(prisma, req.userId).catch(() => {});
+    notify(rec.senderId, 'dm_reaction', { fromFriendId: req.userId });
 
     res.json({ disliked: true });
   } catch (e) {
@@ -239,6 +248,8 @@ router.delete('/recommendations/:id/dismiss', auth, async (req, res) => {
       where: { id: req.params.id },
       data: { dismissedAt: null, dismissedById: null },
     });
+
+    notify(rec.senderId, 'dm_reaction', { fromFriendId: req.userId });
 
     res.json({ dismissed: false });
   } catch (e) {
@@ -264,6 +275,7 @@ router.delete('/recommendations/:id/dislike', auth, async (req, res) => {
     });
 
     refreshTasteProfile(prisma, req.userId).catch(() => {});
+    notify(rec.senderId, 'dm_reaction', { fromFriendId: req.userId });
 
     res.json({ disliked: false });
   } catch (e) {
@@ -282,6 +294,7 @@ router.post('/likes/:id/feedback', auth, async (req, res) => {
 
     const like = await prisma.like.findFirst({
       where: { id: req.params.id, likerId: req.userId },
+      include: { recommendation: { select: { senderId: true } } },
     });
     if (!like) return res.status(404).json({ error: 'Like not found or not yours' });
 
@@ -291,6 +304,8 @@ router.post('/likes/:id/feedback', auth, async (req, res) => {
         data: validTags.map(tag => ({ likeId: req.params.id, tag })),
       });
     }
+
+    notify(like.recommendation.senderId, 'dm_reaction', { fromFriendId: req.userId });
 
     res.json({ tags: validTags });
   } catch (e) {

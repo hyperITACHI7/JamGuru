@@ -357,7 +357,12 @@ export default function ConversationView({ friend, onBack }) {
     setLoading(true)
     setJustLikedIds(new Set())
     getConversation(friend.id)
-      .then(({ data }) => setMessages(data))
+      .then(({ data }) => {
+        setMessages(data)
+        // Opening the conversation marks the friend's recs as seen server-side even
+        // without a reaction — refresh the sidebar so its glow indicator clears now.
+        window.dispatchEvent(new CustomEvent('jam:like'))
+      })
       .catch(() => {})
       .finally(() => setLoading(false))
   }, [friend.id])
@@ -366,7 +371,7 @@ export default function ConversationView({ friend, onBack }) {
   useEffect(() => {
     function handleSse(e) {
       const { type, fromFriendId } = e.detail ?? {}
-      if ((type === 'new_dm_rec' || type === 'new_dm_req') && fromFriendId === friend.id) {
+      if ((type === 'new_dm_rec' || type === 'new_dm_req' || type === 'dm_reaction') && fromFriendId === friend.id) {
         getConversation(friend.id).then(({ data }) => setMessages(data)).catch(() => {})
       }
     }

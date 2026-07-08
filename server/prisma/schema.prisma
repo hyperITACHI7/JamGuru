@@ -123,6 +123,7 @@ model Recommendation {
   requestId      String?   @map("request_id")
   groupRequestId String?   @map("group_request_id")
   sentAt         DateTime  @default(now()) @map("sent_at")
+  seenAt        DateTime? @map("seen_at")
   dismissedAt   DateTime? @map("dismissed_at")
   dismissedById String?   @map("dismissed_by_id")
   preDiscovered Boolean   @default(false) @map("pre_discovered")
