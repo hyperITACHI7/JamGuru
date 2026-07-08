@@ -26,6 +26,25 @@ function formatTime(iso) {
   return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
 }
 
+// Same Today/Yesterday/This Week/Last Week/Earlier buckets used in the recommendations inbox
+function bucketLabel(iso) {
+  const now   = new Date()
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const yesterday = new Date(today.getTime() - 86400000)
+  const dow = today.getDay()
+  const startOfThisWeek = new Date(today.getTime() - (dow === 0 ? 6 : dow - 1) * 86400000)
+  const startOfLastWeek = new Date(startOfThisWeek.getTime() - 7 * 86400000)
+
+  const d   = new Date(iso)
+  const day = new Date(d.getFullYear(), d.getMonth(), d.getDate())
+  const t   = day.getTime()
+  if (t === today.getTime())     return 'Today'
+  if (t === yesterday.getTime()) return 'Yesterday'
+  if (day >= startOfThisWeek)    return 'This Week'
+  if (day >= startOfLastWeek)    return 'Last Week'
+  return 'Earlier'
+}
+
 function renderTemplateWithPills(templateId, vars, openPicker) {
   const tmpl = REQUEST_TEMPLATES.find(t => t.id === templateId)
   if (!tmpl) return null
@@ -557,13 +576,22 @@ export default function GroupConversationView({ group, onBack }) {
             <p className="text-center text-[#535353] text-[10px] uppercase tracking-widest mb-6">
               {group.name} · {messages.filter(m => m.type === 'recommendation').length} song{messages.filter(m => m.type === 'recommendation').length !== 1 ? 's' : ''}
             </p>
-            {messages.map(msg =>
-              msg.type === 'request'
-                ? <GroupRequestBubble key={msg.id} msg={msg}
-                    onPickSong={() => handlePickSongForRequest(msg.id, msg.renderedText)} />
-                : <GroupMessage key={msg.id} msg={msg} onLikeToggle={handleLikeToggle}
-                    requestText={msg.groupRequestId ? requestTextMap[msg.groupRequestId] : null} />
-            )}
+            {messages.map((msg, i) => {
+              const label = bucketLabel(msg.sentAt)
+              const showDivider = i === 0 || label !== bucketLabel(messages[i - 1].sentAt)
+              return (
+                <div key={msg.id}>
+                  {showDivider && (
+                    <p className="text-center text-[#535353] text-[10px] uppercase tracking-widest my-4">{label}</p>
+                  )}
+                  {msg.type === 'request'
+                    ? <GroupRequestBubble msg={msg}
+                        onPickSong={() => handlePickSongForRequest(msg.id, msg.renderedText)} />
+                    : <GroupMessage msg={msg} onLikeToggle={handleLikeToggle}
+                        requestText={msg.groupRequestId ? requestTextMap[msg.groupRequestId] : null} />}
+                </div>
+              )
+            })}
             <div ref={bottomRef} />
           </>
         )}

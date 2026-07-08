@@ -144,39 +144,41 @@ export default function RecommendationCard({ rec: initialRec }) {
         <FeedbackTags likeId={rec.likeId} />
       )}
 
-      {/* Bottom row — Not for me (left) · Not my vibe (right) */}
-      <div className="mt-2.5 pt-2 border-t border-white/5 flex items-center justify-between">
-        {/* Not for me — white when active, disabled when liked/dislike active/tag picker open */}
-        <button
-          onClick={handleDismiss}
-          disabled={rec.liked || dislikeActive || tagPickerOpen}
-          className={`text-[10px] font-medium transition-colors ${
-            dismissActive
-              ? 'text-white'
-              : rec.liked || dislikeActive || tagPickerOpen
-                ? 'text-[#333] cursor-not-allowed'
-                : 'text-[#535353] hover:text-[#B3B3B3]'
-          }`}
-        >
-          Not for me
-        </button>
+      {/* Bottom row — Not for me (left) · Not my vibe (right) — hidden entirely while the tag picker is open */}
+      {!tagPickerOpen && (
+        <div className="mt-2.5 pt-2 border-t border-white/5 flex items-center justify-between">
+          {/* Not for me — white when active, disabled when liked/dislike active */}
+          <button
+            onClick={handleDismiss}
+            disabled={rec.liked || dislikeActive}
+            className={`text-[10px] font-medium transition-colors ${
+              dismissActive
+                ? 'text-white'
+                : rec.liked || dislikeActive
+                  ? 'text-[#333] cursor-not-allowed'
+                  : 'text-[#535353] hover:text-[#B3B3B3]'
+            }`}
+          >
+            Not for me
+          </button>
 
-        {/* Not my vibe — red when active, disabled when liked/dismiss active/tag picker open */}
-        <button
-          onClick={handleDislike}
-          disabled={rec.liked || dismissActive || tagPickerOpen}
-          className={`flex items-center gap-1 text-[10px] font-medium transition-colors ${
-            dislikeActive
-              ? 'text-red-400'
-              : rec.liked || dismissActive || tagPickerOpen
-                ? 'text-[#333] cursor-not-allowed'
-                : 'text-[#535353] hover:text-red-400'
-          }`}
-        >
-          <ThumbsDown size={10} fill={dislikeActive ? 'currentColor' : 'none'} />
-          Not my vibe
-        </button>
-      </div>
+          {/* Not my vibe — red when active, disabled when liked/dismiss active */}
+          <button
+            onClick={handleDislike}
+            disabled={rec.liked || dismissActive}
+            className={`flex items-center gap-1 text-[10px] font-medium transition-colors ${
+              dislikeActive
+                ? 'text-red-400'
+                : rec.liked || dismissActive
+                  ? 'text-[#333] cursor-not-allowed'
+                  : 'text-[#535353] hover:text-red-400'
+            }`}
+          >
+            <ThumbsDown size={10} fill={dislikeActive ? 'currentColor' : 'none'} />
+            Not my vibe
+          </button>
+        </div>
+      )}
     </div>
   )
 }

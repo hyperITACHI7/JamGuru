@@ -108,7 +108,7 @@ export default function JamGuru() {
             <FriendsDmPanel
               selected={selectedEntity}
               onSelect={(e) => { setSelectedEntity(e); setShowMobileMessages(false) }}
-              className="!w-full border-l-0"
+              className="!w-full border-l-0 shadow-none"
             />
           </div>
         </div>
