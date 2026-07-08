@@ -76,7 +76,7 @@ export default function FriendsDmPanel({ selected, onSelect, className = '' }) {
       text: `Sent ${s.newSongsCount} new song${s.newSongsCount > 1 ? 's' : ''}`,
       unseen: true,
     }
-    return { text: 'No new messages', unseen: false, muted: true }
+    return { text: '', unseen: false, muted: true }
   }
 
   function groupSubtitle(g) {
@@ -132,11 +132,13 @@ export default function FriendsDmPanel({ selected, onSelect, className = '' }) {
           <p className={`text-sm font-medium truncate ${active ? 'text-white' : 'text-[#B3B3B3]'}`}>
             {f.displayName}
           </p>
-          <p className={`text-xs truncate ${
-            sub.unseen ? 'glow-green text-[#1DB954] font-bold' : sub.muted ? 'text-[#535353]' : 'text-[#B3B3B3]'
-          }`}>
-            {sub.text}
-          </p>
+          {sub.text && (
+            <p className={`text-xs truncate ${
+              sub.unseen ? 'glow-green text-[#1DB954] font-bold' : sub.muted ? 'text-[#535353]' : 'text-[#B3B3B3]'
+            }`}>
+              {sub.text}
+            </p>
+          )}
         </div>
         {active && <div className="w-1.5 h-1.5 rounded-full bg-[#1DB954] flex-shrink-0" />}
       </button>
@@ -179,7 +181,7 @@ export default function FriendsDmPanel({ selected, onSelect, className = '' }) {
     <div className={`w-[240px] flex-shrink-0 min-h-0 border-l border-white/10 shadow-[-6px_0_16px_-10px_rgba(0,0,0,0.7)] flex flex-col overflow-hidden ${className}`}>
 
       {/* Tab switcher */}
-      <div className="px-3 pt-3 pb-3 flex-shrink-0 border-b border-white/5">
+      <div className="px-3 pt-3 pb-3 flex-shrink-0 border-b border-white/15">
         <div className="flex bg-[#1a1a1a] rounded-full p-0.5">
           <button
             onClick={() => switchTab('friends')}
