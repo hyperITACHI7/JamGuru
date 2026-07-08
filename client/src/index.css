@@ -26,3 +26,12 @@ body {
   background: #535353;
   border-radius: 3px;
 }
+
+@keyframes glow-pulse {
+  0%, 100% { text-shadow: 0 0 4px rgba(29, 185, 84, 0.55); }
+  50%      { text-shadow: 0 0 11px rgba(29, 185, 84, 1), 0 0 18px rgba(29, 185, 84, 0.55); }
+}
+.glow-green {
+  text-shadow: 0 0 6px rgba(29, 185, 84, 0.85);
+  animation: glow-pulse 1.6s ease-in-out infinite;
+}

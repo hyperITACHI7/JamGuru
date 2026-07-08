@@ -69,12 +69,12 @@ export default function FriendsDmPanel({ selected, onSelect, className = '' }) {
 
   function friendSubtitle(f) {
     const s = summary.friends[f.id]
-    if (s?.openRequestCount > 0) return { text: 'Requested a song', green: true }
+    if (s?.openRequestCount > 0) return { text: 'Requested a song', unseen: true }
     if (s?.newSongsCount    > 0) return {
       text: `Sent ${s.newSongsCount} new song${s.newSongsCount > 1 ? 's' : ''}`,
-      green: false,
+      unseen: true,
     }
-    return { text: `@${f.username}`, green: false, muted: true }
+    return { text: 'No new messages', unseen: false, muted: true }
   }
 
   function groupSubtitle(g) {
@@ -82,12 +82,12 @@ export default function FriendsDmPanel({ selected, onSelect, className = '' }) {
     const songs = s?.newSongsCount    ?? 0
     const reqs  = s?.openRequestCount ?? 0
     if (songs === 0 && reqs === 0) {
-      return { text: `${g.memberCount ?? g._count?.members ?? 0} members`, green: false, muted: true }
+      return { text: `${g.memberCount ?? g._count?.members ?? 0} members`, unseen: false, muted: true }
     }
     const parts = []
     if (songs > 0) parts.push(`${songs} song recommendation${songs > 1 ? 's' : ''}`)
     if (reqs  > 0) parts.push(`${reqs} request${reqs > 1 ? 's' : ''}`)
-    return { text: parts.join(' · '), green: reqs > 0 }
+    return { text: parts.join(' · '), unseen: true }
   }
 
   const sortedFriends = sort === 'score'
@@ -162,8 +162,8 @@ export default function FriendsDmPanel({ selected, onSelect, className = '' }) {
         </div>
       )}
 
-      {/* List */}
-      <div className="flex-1 overflow-y-auto">
+      {/* List — rows are sized so at most 7 are visible before scrolling kicks in */}
+      <div className="flex-1 overflow-y-auto" style={{ maxHeight: 'calc(7 * 4.75rem)' }}>
         {loading ? (
           <div className="flex justify-center pt-8">
             <div className="w-4 h-4 border-2 border-[#1DB954] border-t-transparent rounded-full animate-spin" />
@@ -186,11 +186,12 @@ export default function FriendsDmPanel({ selected, onSelect, className = '' }) {
                   <button
                     key={f.id}
                     onClick={() => onSelect(active ? null : { type: 'friend', data: f })}
-                    className={`w-full flex items-center gap-3 px-3 py-2.5 transition-colors text-left ${
+                    style={{ height: '4.75rem' }}
+                    className={`w-full flex items-center gap-3.5 px-3.5 transition-colors text-left ${
                       active ? 'bg-white/10' : 'hover:bg-white/5'
                     }`}
                   >
-                    <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 transition-colors ${
+                    <div className={`w-12 h-12 rounded-full flex items-center justify-center text-base font-bold flex-shrink-0 transition-colors ${
                       active ? 'bg-gradient-to-br from-[#1DB954] to-emerald-700 text-black' : 'bg-[#535353] text-white'
                     }`}>
                       {f.displayName?.[0]?.toUpperCase() ?? '?'}
@@ -200,7 +201,7 @@ export default function FriendsDmPanel({ selected, onSelect, className = '' }) {
                         {f.displayName}
                       </p>
                       <p className={`text-xs truncate ${
-                        sub.green ? 'text-[#1DB954] font-semibold' : sub.muted ? 'text-[#535353]' : 'text-[#B3B3B3]'
+                        sub.unseen ? 'glow-green text-[#1DB954] font-bold' : sub.muted ? 'text-[#535353]' : 'text-[#B3B3B3]'
                       }`}>
                         {sub.text}
                       </p>
@@ -229,21 +230,22 @@ export default function FriendsDmPanel({ selected, onSelect, className = '' }) {
                   <button
                     key={g.id}
                     onClick={() => onSelect(active ? null : { type: 'group', data: g })}
-                    className={`w-full flex items-center gap-3 px-3 py-2.5 transition-colors text-left ${
+                    style={{ height: '4.75rem' }}
+                    className={`w-full flex items-center gap-3.5 px-3.5 transition-colors text-left ${
                       active ? 'bg-white/10' : 'hover:bg-white/5'
                     }`}
                   >
-                    <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors ${
+                    <div className={`w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors ${
                       active ? 'bg-gradient-to-br from-purple-500 to-violet-700' : 'bg-gradient-to-br from-purple-700 to-violet-900'
                     }`}>
-                      <Users size={14} className="text-white" />
+                      <Users size={16} className="text-white" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className={`text-sm font-medium truncate ${active ? 'text-white' : 'text-[#B3B3B3]'}`}>
                         {g.name}
                       </p>
                       <p className={`text-xs truncate ${
-                        sub.green ? 'text-[#1DB954] font-semibold' : sub.muted ? 'text-[#535353]' : 'text-[#B3B3B3]'
+                        sub.unseen ? 'glow-green text-[#1DB954] font-bold' : sub.muted ? 'text-[#535353]' : 'text-[#B3B3B3]'
                       }`}>
                         {sub.text}
                       </p>

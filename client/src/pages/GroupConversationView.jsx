@@ -960,16 +960,16 @@ export default function GroupConversationView({ group, onBack }) {
               Request a Song
             </button>
             <div className="flex-1" />
+            <button onClick={handleAiSuggest} disabled={suggesting}
+              className="flex items-center gap-1.5 text-xs font-semibold text-purple-400 hover:text-purple-300 transition-colors disabled:opacity-50 flex-shrink-0">
+              <Sparkles size={12} className={suggesting ? 'animate-pulse' : ''} />
+              {suggesting ? 'Finding…' : 'AI Suggest'}
+            </button>
             <button onClick={openLibrary} title="Pick from your library"
               className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 transition-colors ${
                 showLibrary ? 'bg-purple-600 text-white' : 'bg-[#282828] text-[#B3B3B3] hover:text-white hover:bg-[#3e3e3e]'
               }`}>
               <Plus size={15} />
-            </button>
-            <button onClick={handleAiSuggest} disabled={suggesting}
-              className="flex items-center gap-1.5 text-xs font-semibold text-purple-400 hover:text-purple-300 transition-colors disabled:opacity-50 flex-shrink-0">
-              <Sparkles size={12} className={suggesting ? 'animate-pulse' : ''} />
-              {suggesting ? 'Finding…' : 'AI Suggest'}
             </button>
           </div>
         )}
