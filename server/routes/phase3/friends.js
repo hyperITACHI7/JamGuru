@@ -30,11 +30,11 @@ router.get('/', auth, async (req, res) => {
   }
 });
 
-// GET /api/friends/inbox-summary — per-friend and per-group unreacted activity counts
+// GET /api/friends/inbox-summary — per-friend and per-group unreacted activity counts + last activity time
 router.get('/inbox-summary', auth, async (req, res) => {
   const me = req.userId;
   try {
-    const [dmNewRecs, dmOpenReqs, groupNewRecs, groupOpenReqs] = await Promise.all([
+    const [dmNewRecs, dmOpenReqs, groupNewRecs, groupOpenReqs, dmRecActivity, dmReqActivity, groupRecActivity, groupReqActivity] = await Promise.all([
       // DM recs from friends not yet liked or dismissed
       prisma.recommendation.findMany({
         where: { recipientId: me, groupId: null, dismissedAt: null, likes: { none: { likerId: me } } },
@@ -65,6 +65,26 @@ router.get('/inbox-summary', auth, async (req, res) => {
         },
         select: { groupId: true },
       }),
+      // All DM recs either direction — for last-activity timestamps
+      prisma.recommendation.findMany({
+        where: { groupId: null, OR: [{ senderId: me }, { recipientId: me }] },
+        select: { senderId: true, recipientId: true, sentAt: true },
+      }),
+      // All DM song requests either direction — for last-activity timestamps
+      prisma.songRequest.findMany({
+        where: { OR: [{ senderId: me }, { recipientId: me }] },
+        select: { senderId: true, recipientId: true, sentAt: true },
+      }),
+      // All group recs in my groups — for last-activity timestamps
+      prisma.recommendation.findMany({
+        where: { groupId: { not: null }, group: { members: { some: { userId: me } } } },
+        select: { groupId: true, sentAt: true },
+      }),
+      // All group song requests in my groups — for last-activity timestamps
+      prisma.groupSongRequest.findMany({
+        where: { group: { members: { some: { userId: me } } } },
+        select: { groupId: true, sentAt: true },
+      }),
     ]);
 
     const dmSongs = {}, dmReqs = {}, grpSongs = {}, grpReqs = {};
@@ -73,15 +93,28 @@ router.get('/inbox-summary', auth, async (req, res) => {
     for (const r of groupNewRecs)  grpSongs[r.groupId] = (grpSongs[r.groupId] ?? 0) + 1;
     for (const r of groupOpenReqs) grpReqs[r.groupId]  = (grpReqs[r.groupId]  ?? 0) + 1;
 
-    const friendIds = [...new Set([...Object.keys(dmSongs), ...Object.keys(dmReqs)])];
-    const groupIds  = [...new Set([...Object.keys(grpSongs), ...Object.keys(grpReqs)])];
+    const lastActivity = {};
+    for (const r of [...dmRecActivity, ...dmReqActivity]) {
+      const otherId = r.senderId === me ? r.recipientId : r.senderId;
+      if (!otherId) continue;
+      if (!lastActivity[otherId] || r.sentAt > lastActivity[otherId]) lastActivity[otherId] = r.sentAt;
+    }
+    const groupLastActivity = {};
+    for (const r of [...groupRecActivity, ...groupReqActivity]) {
+      if (!groupLastActivity[r.groupId] || r.sentAt > groupLastActivity[r.groupId]) groupLastActivity[r.groupId] = r.sentAt;
+    }
+
+    const friendIds = new Set([...Object.keys(dmSongs), ...Object.keys(dmReqs), ...Object.keys(lastActivity)]);
+    const groupIds  = new Set([...Object.keys(grpSongs), ...Object.keys(grpReqs), ...Object.keys(groupLastActivity)]);
 
     res.json({
-      friends: friendIds.map(id => ({
+      friends: [...friendIds].map(id => ({
         friendId: id, newSongsCount: dmSongs[id] ?? 0, openRequestCount: dmReqs[id] ?? 0,
+        lastActivityAt: lastActivity[id] ?? null,
       })),
-      groups: groupIds.map(id => ({
+      groups: [...groupIds].map(id => ({
         groupId: id, newSongsCount: grpSongs[id] ?? 0, openRequestCount: grpReqs[id] ?? 0,
+        lastActivityAt: groupLastActivity[id] ?? null,
       })),
     });
   } catch (e) {

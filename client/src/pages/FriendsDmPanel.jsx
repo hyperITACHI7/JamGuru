@@ -1,9 +1,42 @@
 import { useState, useEffect, useCallback } from 'react'
-import { MessageCircle, Users, UserPlus, Plus } from 'lucide-react'
+import { MessageCircle, Users, UserPlus, Plus, Search, X } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { getFriends, getInboxSummary } from '../phase3/api/friends'
 import { getGroups } from '../phase5/api/groups'
 import { getTrustRankings } from '../phase4/api/jamguru'
+
+function groupByTime(items, getDate) {
+  const now   = new Date()
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const yesterday = new Date(today.getTime() - 86400000)
+  const dow = today.getDay()
+  const startOfThisWeek = new Date(today.getTime() - (dow === 0 ? 6 : dow - 1) * 86400000)
+  const startOfLastWeek = new Date(startOfThisWeek.getTime() - 7 * 86400000)
+
+  const buckets = [
+    { label: 'Today',           items: [] },
+    { label: 'Yesterday',       items: [] },
+    { label: 'This Week',       items: [] },
+    { label: 'Last Week',       items: [] },
+    { label: 'Earlier',         items: [] },
+    { label: 'No messages yet', items: [] },
+  ]
+
+  for (const item of items) {
+    const raw = getDate(item)
+    if (!raw) { buckets[5].items.push(item); continue }
+    const d   = new Date(raw)
+    const day = new Date(d.getFullYear(), d.getMonth(), d.getDate())
+    const t   = day.getTime()
+    if (t === today.getTime())          buckets[0].items.push(item)
+    else if (t === yesterday.getTime()) buckets[1].items.push(item)
+    else if (day >= startOfThisWeek)    buckets[2].items.push(item)
+    else if (day >= startOfLastWeek)    buckets[3].items.push(item)
+    else                                buckets[4].items.push(item)
+  }
+
+  return buckets.filter(b => b.items.length > 0)
+}
 
 export default function FriendsDmPanel({ selected, onSelect, className = '' }) {
   const [tab, setTab]         = useState('friends')
@@ -11,8 +44,9 @@ export default function FriendsDmPanel({ selected, onSelect, className = '' }) {
   const [groups, setGroups]   = useState([])
   const [loading, setLoading] = useState(true)
   const [sort, setSort]       = useState('latest')
+  const [query, setQuery]     = useState('')
   const [trustMap, setTrustMap] = useState({})
-  // summary: { friends: { [friendId]: { newSongsCount, openRequestCount } }, groups: { [groupId]: {...} } }
+  // summary: { friends: { [friendId]: { newSongsCount, openRequestCount, lastActivityAt } }, groups: { [groupId]: {...} } }
   const [summary, setSummary] = useState({ friends: {}, groups: {} })
 
   const fetchSummary = useCallback(() => {
@@ -59,6 +93,7 @@ export default function FriendsDmPanel({ selected, onSelect, className = '' }) {
 
   function switchTab(next) {
     setTab(next)
+    setQuery('')
     if (selected && selected.type !== next.replace('friends', 'friend').replace('groups', 'group')) {
       onSelect(null)
     }
@@ -90,13 +125,92 @@ export default function FriendsDmPanel({ selected, onSelect, className = '' }) {
     return { text: parts.join(' · '), unseen: true }
   }
 
+  const friendActivityTime = (f) => {
+    const t = summary.friends[f.id]?.lastActivityAt
+    return t ? new Date(t).getTime() : -Infinity
+  }
+  const groupActivityTime = (g) => {
+    const t = summary.groups[g.id]?.lastActivityAt
+    return t ? new Date(t).getTime() : -Infinity
+  }
+
+  const matchesQuery = (name) => name?.toLowerCase().includes(query.trim().toLowerCase())
+
   const sortedFriends = sort === 'score'
     ? [...friends].sort((a, b) => (trustMap[b.id] ?? 0) - (trustMap[a.id] ?? 0))
-    : [...friends].sort((a, b) => {
-        const aAct = (summary.friends[a.id]?.newSongsCount ?? 0) + (summary.friends[a.id]?.openRequestCount ?? 0)
-        const bAct = (summary.friends[b.id]?.newSongsCount ?? 0) + (summary.friends[b.id]?.openRequestCount ?? 0)
-        return bAct - aAct
-      })
+    : [...friends].sort((a, b) => friendActivityTime(b) - friendActivityTime(a))
+  const visibleFriends = sortedFriends.filter(f => matchesQuery(f.displayName))
+  const friendGroups = sort === 'latest'
+    ? groupByTime(visibleFriends, f => summary.friends[f.id]?.lastActivityAt)
+    : [{ label: null, items: visibleFriends }]
+
+  const sortedGroups = [...groups].sort((a, b) => groupActivityTime(b) - groupActivityTime(a))
+  const visibleGroups = sortedGroups.filter(g => matchesQuery(g.name))
+  const groupGroups = groupByTime(visibleGroups, g => summary.groups[g.id]?.lastActivityAt)
+
+  function renderFriendRow(f) {
+    const active = isFriendSelected(f)
+    const sub    = friendSubtitle(f)
+    return (
+      <button
+        key={f.id}
+        onClick={() => onSelect(active ? null : { type: 'friend', data: f })}
+        style={{ height: '4.75rem' }}
+        className={`w-full flex items-center gap-3.5 px-3.5 transition-colors text-left ${
+          active ? 'bg-white/10' : 'hover:bg-white/5'
+        }`}
+      >
+        <div className={`w-12 h-12 rounded-full flex items-center justify-center text-base font-bold flex-shrink-0 transition-colors ${
+          active ? 'bg-gradient-to-br from-[#1DB954] to-emerald-700 text-black' : 'bg-[#535353] text-white'
+        }`}>
+          {f.displayName?.[0]?.toUpperCase() ?? '?'}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className={`text-sm font-medium truncate ${active ? 'text-white' : 'text-[#B3B3B3]'}`}>
+            {f.displayName}
+          </p>
+          <p className={`text-xs truncate ${
+            sub.unseen ? 'glow-green text-[#1DB954] font-bold' : sub.muted ? 'text-[#535353]' : 'text-[#B3B3B3]'
+          }`}>
+            {sub.text}
+          </p>
+        </div>
+        {active && <div className="w-1.5 h-1.5 rounded-full bg-[#1DB954] flex-shrink-0" />}
+      </button>
+    )
+  }
+
+  function renderGroupRow(g) {
+    const active = isGroupSelected(g)
+    const sub    = groupSubtitle(g)
+    return (
+      <button
+        key={g.id}
+        onClick={() => onSelect(active ? null : { type: 'group', data: g })}
+        style={{ height: '4.75rem' }}
+        className={`w-full flex items-center gap-3.5 px-3.5 transition-colors text-left ${
+          active ? 'bg-white/10' : 'hover:bg-white/5'
+        }`}
+      >
+        <div className={`w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors ${
+          active ? 'bg-gradient-to-br from-purple-500 to-violet-700' : 'bg-gradient-to-br from-purple-700 to-violet-900'
+        }`}>
+          <Users size={16} className="text-white" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className={`text-sm font-medium truncate ${active ? 'text-white' : 'text-[#B3B3B3]'}`}>
+            {g.name}
+          </p>
+          <p className={`text-xs truncate ${
+            sub.unseen ? 'glow-green text-[#1DB954] font-bold' : sub.muted ? 'text-[#535353]' : 'text-[#B3B3B3]'
+          }`}>
+            {sub.text}
+          </p>
+        </div>
+        {active && <div className="w-1.5 h-1.5 rounded-full bg-purple-400 flex-shrink-0" />}
+      </button>
+    )
+  }
 
   return (
     <div className={`w-[240px] flex-shrink-0 border-l border-white/5 flex flex-col overflow-hidden ${className}`}>
@@ -162,7 +276,7 @@ export default function FriendsDmPanel({ selected, onSelect, className = '' }) {
         </div>
       )}
 
-      {/* List — rows are sized so at most 7 are visible before scrolling kicks in */}
+      {/* List — grouped by time period, capped so scrolling kicks in past ~7 rows worth of height */}
       <div className="flex-1 overflow-y-auto" style={{ maxHeight: 'calc(7 * 4.75rem)' }}>
         {loading ? (
           <div className="flex justify-center pt-8">
@@ -177,39 +291,23 @@ export default function FriendsDmPanel({ selected, onSelect, className = '' }) {
                 Find friends →
               </Link>
             </div>
+          ) : visibleFriends.length === 0 ? (
+            <div className="px-4 py-10 text-center">
+              <Search size={24} className="text-[#535353] mx-auto mb-2" />
+              <p className="text-[#B3B3B3] text-xs">No friends match "{query}"</p>
+            </div>
           ) : (
             <div className="py-1">
-              {sortedFriends.map(f => {
-                const active = isFriendSelected(f)
-                const sub    = friendSubtitle(f)
-                return (
-                  <button
-                    key={f.id}
-                    onClick={() => onSelect(active ? null : { type: 'friend', data: f })}
-                    style={{ height: '4.75rem' }}
-                    className={`w-full flex items-center gap-3.5 px-3.5 transition-colors text-left ${
-                      active ? 'bg-white/10' : 'hover:bg-white/5'
-                    }`}
-                  >
-                    <div className={`w-12 h-12 rounded-full flex items-center justify-center text-base font-bold flex-shrink-0 transition-colors ${
-                      active ? 'bg-gradient-to-br from-[#1DB954] to-emerald-700 text-black' : 'bg-[#535353] text-white'
-                    }`}>
-                      {f.displayName?.[0]?.toUpperCase() ?? '?'}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className={`text-sm font-medium truncate ${active ? 'text-white' : 'text-[#B3B3B3]'}`}>
-                        {f.displayName}
-                      </p>
-                      <p className={`text-xs truncate ${
-                        sub.unseen ? 'glow-green text-[#1DB954] font-bold' : sub.muted ? 'text-[#535353]' : 'text-[#B3B3B3]'
-                      }`}>
-                        {sub.text}
-                      </p>
-                    </div>
-                    {active && <div className="w-1.5 h-1.5 rounded-full bg-[#1DB954] flex-shrink-0" />}
-                  </button>
-                )
-              })}
+              {friendGroups.map(group => (
+                <div key={group.label ?? 'flat'}>
+                  {group.label && (
+                    <p className="px-3.5 pt-3 pb-1 text-[10px] font-bold uppercase tracking-widest text-[#535353]">
+                      {group.label}
+                    </p>
+                  )}
+                  {group.items.map(renderFriendRow)}
+                </div>
+              ))}
             </div>
           )
         ) : (
@@ -221,42 +319,45 @@ export default function FriendsDmPanel({ selected, onSelect, className = '' }) {
                 Create one →
               </Link>
             </div>
+          ) : visibleGroups.length === 0 ? (
+            <div className="px-4 py-10 text-center">
+              <Search size={24} className="text-[#535353] mx-auto mb-2" />
+              <p className="text-[#B3B3B3] text-xs">No groups match "{query}"</p>
+            </div>
           ) : (
             <div className="py-1">
-              {groups.map(g => {
-                const active = isGroupSelected(g)
-                const sub    = groupSubtitle(g)
-                return (
-                  <button
-                    key={g.id}
-                    onClick={() => onSelect(active ? null : { type: 'group', data: g })}
-                    style={{ height: '4.75rem' }}
-                    className={`w-full flex items-center gap-3.5 px-3.5 transition-colors text-left ${
-                      active ? 'bg-white/10' : 'hover:bg-white/5'
-                    }`}
-                  >
-                    <div className={`w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors ${
-                      active ? 'bg-gradient-to-br from-purple-500 to-violet-700' : 'bg-gradient-to-br from-purple-700 to-violet-900'
-                    }`}>
-                      <Users size={16} className="text-white" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className={`text-sm font-medium truncate ${active ? 'text-white' : 'text-[#B3B3B3]'}`}>
-                        {g.name}
-                      </p>
-                      <p className={`text-xs truncate ${
-                        sub.unseen ? 'glow-green text-[#1DB954] font-bold' : sub.muted ? 'text-[#535353]' : 'text-[#B3B3B3]'
-                      }`}>
-                        {sub.text}
-                      </p>
-                    </div>
-                    {active && <div className="w-1.5 h-1.5 rounded-full bg-purple-400 flex-shrink-0" />}
-                  </button>
-                )
-              })}
+              {groupGroups.map(group => (
+                <div key={group.label}>
+                  <p className="px-3.5 pt-3 pb-1 text-[10px] font-bold uppercase tracking-widest text-[#535353]">
+                    {group.label}
+                  </p>
+                  {group.items.map(renderGroupRow)}
+                </div>
+              ))}
             </div>
           )
         )}
+      </div>
+
+      {/* Search — pinned to the bottom of the panel, always visible without scrolling */}
+      <div className="flex-shrink-0 border-t border-white/10 bg-[#181818] px-3 py-2.5">
+        <div className="relative">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#535353] pointer-events-none" />
+          <input
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            placeholder={tab === 'friends' ? 'Search friends' : 'Search groups'}
+            className="w-full bg-[#2a2a2a] text-white text-xs rounded-full pl-8 pr-8 py-2 focus:outline-none focus:ring-1 focus:ring-[#1DB954]/50 placeholder-[#535353]"
+          />
+          {query && (
+            <button
+              onClick={() => setQuery('')}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#535353] hover:text-white transition-colors"
+            >
+              <X size={13} />
+            </button>
+          )}
+        </div>
       </div>
     </div>
   )
