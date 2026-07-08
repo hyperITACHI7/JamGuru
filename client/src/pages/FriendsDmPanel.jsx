@@ -178,7 +178,7 @@ export default function FriendsDmPanel({ selected, onSelect, className = '' }) {
   }
 
   return (
-    <div className={`w-[240px] flex-shrink-0 min-h-0 border-l border-white/10 shadow-[-6px_0_16px_-10px_rgba(0,0,0,0.7)] flex flex-col overflow-hidden ${className}`}>
+    <div className={`w-[360px] flex-shrink-0 min-h-0 border-l border-white/10 shadow-[-6px_0_16px_-10px_rgba(0,0,0,0.7)] flex flex-col overflow-hidden ${className}`}>
 
       {/* Tab switcher */}
       <div className="px-3 pt-3 pb-3 flex-shrink-0 border-b border-white/15">
