@@ -118,12 +118,11 @@ export default function FriendsDmPanel({ selected, onSelect, className = '' }) {
       <button
         key={f.id}
         onClick={() => onSelect(active ? null : { type: 'friend', data: f })}
-        style={{ height: '4.75rem' }}
-        className={`w-full flex items-center gap-3.5 px-3.5 transition-colors text-left ${
+        className={`w-full flex items-center gap-3 px-3 md:gap-3.5 md:px-3.5 h-14 md:h-[4.75rem] transition-colors text-left ${
           active ? 'bg-white/10' : 'hover:bg-white/5'
         }`}
       >
-        <div className={`w-12 h-12 rounded-full flex items-center justify-center text-base font-bold flex-shrink-0 transition-colors ${
+        <div className={`w-9 h-9 md:w-12 md:h-12 rounded-full flex items-center justify-center text-sm md:text-base font-bold flex-shrink-0 transition-colors ${
           active ? 'bg-gradient-to-br from-[#1DB954] to-emerald-700 text-black' : 'bg-[#535353] text-white'
         }`}>
           {f.displayName?.[0]?.toUpperCase() ?? '?'}
@@ -152,15 +151,15 @@ export default function FriendsDmPanel({ selected, onSelect, className = '' }) {
       <button
         key={g.id}
         onClick={() => onSelect(active ? null : { type: 'group', data: g })}
-        style={{ height: '4.75rem' }}
-        className={`w-full flex items-center gap-3.5 px-3.5 transition-colors text-left ${
+        className={`w-full flex items-center gap-3 px-3 md:gap-3.5 md:px-3.5 h-14 md:h-[4.75rem] transition-colors text-left ${
           active ? 'bg-white/10' : 'hover:bg-white/5'
         }`}
       >
-        <div className={`w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors ${
+        <div className={`w-9 h-9 md:w-12 md:h-12 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors ${
           active ? 'bg-gradient-to-br from-purple-500 to-violet-700' : 'bg-gradient-to-br from-purple-700 to-violet-900'
         }`}>
-          <Users size={16} className="text-white" />
+          <Users size={14} className="text-white md:hidden" />
+          <Users size={16} className="text-white hidden md:block" />
         </div>
         <div className="flex-1 min-w-0">
           <p className={`text-sm font-medium truncate ${active ? 'text-white' : 'text-[#B3B3B3]'}`}>
