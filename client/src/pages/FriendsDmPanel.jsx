@@ -222,8 +222,10 @@ export default function FriendsDmPanel({ selected, onSelect, className = '' }) {
         </div>
       )}
 
-      {/* List — the Add Friend / Join Group CTA lives as the last item, after all rows */}
-      <div className="flex-1 overflow-y-auto min-h-0" style={{ maxHeight: 'calc(7 * 4.75rem)' }}>
+      {/* List — fills whatever space is left above the search bar (no hardcoded height, so it
+          adapts to any screen size) and scrolls once rows exceed that space. The Add Friend /
+          Join Group CTA lives as the last item, after all rows. */}
+      <div className="flex-1 overflow-y-auto min-h-0">
         {loading ? (
           <div className="flex justify-center pt-8">
             <div className="w-4 h-4 border-2 border-[#1DB954] border-t-transparent rounded-full animate-spin" />
